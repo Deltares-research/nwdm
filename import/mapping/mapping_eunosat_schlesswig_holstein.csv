@@ -1,0 +1,9 @@
+parameter;einheit;multiply;p01;p06
+o-Phosphat-P;mg/l;1;PHOSKGD5;UMGL
+Salzgehalt;;1;ODSDM021;UGKG
+Chlorophyll-A;�g/l;1;CPHLHPP1;UGPL
+Ammonium-N;mg/l;1;AMONAAD4;UMGL
+Nitrit-N;mg/l;1;NTRIMADZ;UMGL
+Nitrat-N;mg/l;1;NTRAXXDZ;UMGL
+Sichttiefe;m;1;SECCSDNX;ULAA
+Silikat-Si;mg/l;1;SLCAAAD1;UMGL

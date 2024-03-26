@@ -1,0 +1,8 @@
+headerline;p06
+value[urn:mm.def:units#psu];UGKG
+value[urn:mm.def:units#1e-3];UGKG
+value[urn:mm.def:units#ug/l];UGPL
+value[urn:mm.def:units#mg/m?];UGPL
+value[urn:mm.def:units#1];UGKG
+value[urn:mm.def:units#arb. units];
+value[g/l];UGPL

@@ -1,0 +1,9 @@
+dataset;quantity_original;P01;unit_original;P06;opmerking
+zooplankton_summe;Abundanz;;[Ind./m3];;Number per litre (#/l) DEZE P01 EN P06 WEGGELATEN
+zooplankton_summe;Biovolumen;SDBIOL13;[mm3/m3];UCUM;Cubic microns per millilitre (um^3/ml)� klopt dat?
+zooplankton_summe;Frischgewicht;MSBCMITX;[mg/m3];UMMC;kon ik niet vinden..  --> DEZE MISSCHIEN?
+zooplankton_summe;Trockengewicht;MSBOGVTX;[mg/m3];UMMC;
+zooplankton_summe;Kohlenstoff;MSICGVTX;[mg/m3];UMMS;
+phytoplankton;chloro_gesamt;;;;
+phytoplankton;chloro_aktiv;CPHLHPP1;;UGPL;ug/l
+phytoplankton;phaeophytin;PHAEZZXX;;UGPL;ug/l

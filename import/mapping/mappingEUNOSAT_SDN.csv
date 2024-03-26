@@ -1,0 +1,26 @@
+csv_name;column;P01;unitBefore;Multiplier;unit;P06;additional
+location_name;x;;;;;;
+latitude;x;;;;;;
+longitude;x;;;;;;
+MSFD;-;;;;;;
+year;date;;;;;;
+month;date;;;;;;
+day;date;;;;;;
+hour;date;;;;;;
+sample_depth;x;;;;;;
+DIN;;DINXZZZZ;umol/l;0.014;mg N/l;UMGL;
+DIP;;PHOSKGD5;umol/l;0.031;mg P/l;UMGL;
+Si;;SLCAAAD1;mg/l;1;mg Si/l;UMGL;
+chlfa;;CPHLHPP1;ug/l;;;UGPL;
+sal;;ODSDM021;PSU;;;UGKG;
+temp;;PSSTTS01;deg C;;;UPAA;
+spm;;SPM02WE1;mg/l;;;UMGL;
+kd;;RXXXPARK;/m;;;UPRM;
+secchi;;SECCSDNX;m;;;ULAA;
+primprod;-;;;;;;
+country;-;;;;;;
+EPSG;;;;;;;4326
+data_holder;;;;;;;EUNOSAT
+ data_owner;;;;;;;EUNOSAT
+ link_to_data;;;;;;;p:\11200300-002-jmp-eunosat\validatiedata\daily_data\
+ link_to_metadata;;;;;;;p:\11200300-002-jmp-eunosat\validatiedata\daily_data\Preprocessing JMP-data2.docx

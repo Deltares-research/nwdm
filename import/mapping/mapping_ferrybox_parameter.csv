@@ -1,0 +1,32 @@
+parameter;p01
+AOA_TotalAlg;CPHLUMTF
+Chl-a_Fluor_Trios_microFlu-chl;CPHLUMTF
+Chl-a_Fluor_Wetlabs_ECO_FLNTU;CPHLUMTF
+FB_CHL-A-Fluorescence;CPHLUMTF
+FLU2;CPHLUMTF
+salinity;PSALCC01
+PSAL_10.0;PSALCC01
+PSAL_11.0;PSALCC01
+PSAL_13.0;PSALCC01
+PSAL_20.0;PSALCC01
+PSAL_25.0;PSALCC01
+PSAL_3.0;PSALCC01
+PSAL_30.0;PSALCC01
+PSAL_35.0;PSALCC01
+PSAL_4.0;PSALCC01
+PSAL_6.0;PSALCC01
+PSAL_8.0;PSALCC01
+FB_Salinity;PSALCC01
+PSAL;PSALCC01
+Sal_SBE_SBE45;PSALCC01
+Sal_Teledyne_Citadel_TS-NH;PSALCC01
+Salinity_Bottom;PSALCC01
+Salinity_Top;PSALCC01
+Chl-a_Fluor_Turner_Scufa;CPHLUMTF
+Fluor_Turner;CPHLUMTF
+Fluor_TurnTcorr;CPHLUMTF
+Chl-a Fluorescence(Turner)_Bottom;CPHLUMTF
+Chl-a Fluorescence(Turner)_Top;CPHLUMTF
+Chl-a_Fluorescence(Turner);CPHLUMTF
+chlorophyll_a;CPHLUMTF
+Chl-a_Fluorescense;CPHLUMTF

@@ -1,0 +1,29 @@
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Open+Sans" />
+
+<style>
+// Deltares colors: #008fc5, #92b6c7, #a09e8d 
+body {
+  font-family: Open Sans;
+}
+
+h2,h3,h4,h5,h6 {
+  color: #008fc5;
+}
+h1 {
+  color: #eb0073;
+}
+.author {
+  font-weight: bold;
+}
+pre,img {
+ background-color: #92b6c7;
+ -webkit-filter: drop-shadow(2px 2px 5px rgba(0,0,0,.5)) ;
+ filter: drop-shadow(2px 2px 5px rgba(0,0,0,.5)) sepia(5%);
+}
+pre .identifier {
+ color: white;
+}
+pre .paren {
+ color: #ddd;
+}
+</style>

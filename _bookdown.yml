@@ -1,0 +1,26 @@
+book_filename: "NWDM documentation"
+rmd_files: [
+  "index.Rmd",
+  "documentation.Rmd"]
+output_dir: docs
+new_session: yes
+output:
+  bookdown::gitbook:
+    css: DeltaresStyle.css
+    config:
+      toc:
+        collapse: chapter
+        scroll_highlight: yes
+        before: null
+        after: null
+      toolbar:
+        position: fixed
+      edit : null
+      download: null
+      search: yes
+      fontsettings:
+        theme: white
+        family: sans
+        size: 2
+      info: yes
+    split_by: chapter

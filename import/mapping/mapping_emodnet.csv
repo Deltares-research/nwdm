@@ -1,0 +1,21 @@
+﻿_varid;variable;p01;p35;p06
+1;Depth [m];ADEPZZ01;;ULAA
+2;ITS-90 water temperature [degrees C];;WATERTEMP;UPAA
+3;Water body salinity [per mille];;EPC00001;UPPT
+4;Water body dissolved oxygen concentration [umol/l];;EPC00002;UPOX
+5;Water body dissolved oxygen saturation [%];;EPC00003;UPCT
+6;Water body nitrate [umol/l];;EPC00004;UPOX
+7;Water body nitrate plus nitrite [umol/l];;EPC00005;UPOX
+8;Water body nitrite [umol/l];;EPC00006;UPOX
+9;Water body phosphate [umol/l];;EPC00007;UPOX
+10;Water body silicate [umol/l];;EPC00008;UPOX
+11;Water body ammonium [umol/l];;EPC00009;UPOX
+12;Water body chlorophyll-a [mg/m^3];;EPC00105;UMMC
+13;Water body chlorophyll-b [mg/m^3];;EPC00106;UMMC
+14;Water body phaeopigments [mg/m^3];;EPC00108;UMMC
+15;Water body total alkalinity [mEquiv/l];;EPC00131;MEQL
+16;Water body total nitrogen [umol/l];;EPC00134;UPOX
+17;Water body total phosphorus [umol/l];;EPC00135;UPOX
+18;Water body pH [pH units];;EPC00168;UUPH
+19;Aggregated NOx [umol/l];;;
+20;Water body DIN [umol/l];;;
