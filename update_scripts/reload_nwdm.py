@@ -31,6 +31,7 @@ import pandas as pd
 import configparser
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 
 def establish_connection(fc, connections_string=None):
@@ -97,9 +98,9 @@ connstr = (
 session, engine = establish_connection(None, connstr)
 
 #PATHS
-mapping_table_file = r"C:\projectinfo\nl\NWDM\mappingRWSNIOZacidity.csv"
+mapping_table_file = r"C:\develop\nwdm\etl\mapping\mappingRWSNIOZacidity.csv"
 data_table_file = (
-    r"C:\develop\nwdm\nioz_data\RWS-NIOZ North Sea data v2023_10 for SDG14-3-1.xlsx"
+    r"C:\develop\nwdm\data\RWS-NIOZ North Sea data v2023_10 for SDG14-3-1.xlsx"
 )
 
 
@@ -108,20 +109,36 @@ data_table = "nioz"
 schema = "import"
 
 # delete the current import tables
-strsql = f"drop table if exists {schema}.mapping_{mapping_table}"
-engine.execute(strsql)
+strsql = f"drop table if exists {schema}.{mapping_table}"
+with engine.connect() as conn:
+    result = conn.execute(text(strsql))
+
 strsql = f"drop table if exists {schema}.{data_table}"
-engine.execute(strsql)
+with engine.connect() as conn:
+    result = conn.execute(text(strsql))
 
 
 # based on the format use differen read function of PANDAS
 
 
-df_mapping = pd.read_csv(mapping_table_file)
-df_data = pd.read_csv(data_table_file)
+df_mapping = pd.read_csv(mapping_table_file, sep=';')
+df_mapping["_recordnr"] = df_mapping.index + 1
+df_mapping["_short_filename"] = "mappingRWSNIOZacidity.csv"
+df_mapping["_path"] = "https://dataverse.nioz.nl/dataset.xhtml?persistentId=doi:10.25850/nioz/7b.b.kg"
 
+
+df_data = pd.read_excel(data_table_file)
+df_data["_recordnr"] = df_data.index + 1
+df_data["_short_filename"] = "mappingRWSNIOZacidity.csv"
+df_data["_path"] = "https://dataverse.nioz.nl/dataset.xhtml?persistentId=doi:10.25850/nioz/7b.b.kg"
+df_data.columns = df_data.columns.str.lower()
+
+df_data.rename(columns={'date_utc': 'datetime'}, inplace=True)
+
+df_data['datetime'] = pd.to_datetime(df_data['datetime'], errors='coerce')
 
 df_mapping.to_sql(mapping_table, engine, schema=schema)
+
 df_data.to_sql(data_table, engine, schema=schema)
 
 
