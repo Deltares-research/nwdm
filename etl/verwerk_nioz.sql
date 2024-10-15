@@ -1,3 +1,7 @@
+--0. data_owners
+insert into nwdm.data_owner (data_owner,priority) values ('NIOZ',3) on conflict do nothing ;
+
+
 -- 5. nioz data
 insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
 select 400000 + row_number() over (order by _path,"_short_filename") dataset_id
@@ -8,8 +12,8 @@ select 400000 + row_number() over (order by _path,"_short_filename") dataset_id
 , count(*) number_of_records
 , 'NIOZ' data_holder
 , 'NIOZ' data_owner
-, 'https://dataverse.nioz.nl/dataset.xhtml?persistentId=doi:10.25850/nioz/7b.b.kg' link_to_data
-, 'https://dataverse.nioz.nl/dataset.xhtml?persistentId=doi:10.25850/nioz/7b.b.kg' link_to_metadata
+, 'https://repos.deltares.nl/repos/Wozep/trunk/NWDM/nioz_data' link_to_data
+, 'https://doi.org/10.25850/nioz/7b.b.1' link_to_metadata
 from import.nioz fh
 group by "_short_filename", "_path";
 
@@ -33,9 +37,6 @@ from (
 ) g where st_contains((select geom from nwdm.scope_northsea),g.geom);
 ;
 
-select l.* from nwdm.location l  where l.data_owner ='NIOZ';
-
-
 
 -- 5. nioz data
 insert into nwdm.measurement (recordnr_dataset, recordvolgnr_dataset, dataset_id, location_id, "date", "depth", vertical_reference_id, parameter_id, unit_id, value, quality_id)
@@ -55,23 +56,24 @@ rd._recordnr as recordnr_dataset
 from (
     select
     cnr, cname, cvalue
-    , case cname    when 'dic' then dic_flag
-                    when 'alkalinity' then alkalinity_flag end as flag
-                    
-    ,station, bottle_id, datetime, depth_nominal, _recordnr, _short_filename, _path
+    , case cname    when 'tco2kg01_kgum' then tco2kg01_kgum_flag
+                    when 'mdmap014_kgum' then mdmap014_kgum_flag
+                    when 'phmassxx' then phmassxx_flag end as flag
+    ,station, bottle_id, datetime, depth, _recordnr, _short_filename, _path
     from (
-         select unnest(array [1,2,3,4,5]) as cnr
-              , unnest(array ['temperature','salinity','dic','alkalinity']) as cname
-              , replace(unnest(array['temperature', 'salinity', 'dic', 'alkalinity']), ',', '.') as cvalue
- -- komma=duizendscheidingsteken
-              , dic_flag
-              , alkalinity_flag
-              ,station, bottle_id, datetime, depth_nominal, _recordnr, _short_filename, _path
-         from (select * from import.nioz ) sub
+         select unnest(array [1,2,3,4,5])                                                           as cnr
+              , unnest(array ['temperature','salinity','tco2kg01_kgum','mdmap014_kgum','phmassxx']) as cname
+              , replace(unnest(array ["temperature","salinity","tco2kg01_kgum","mdmap014_kgum","phmassxx"]), ',',
+                        '.')                                                                        as cvalue -- komma=duizendscheidingsteken
+              , tco2kg01_kgum_flag
+              , mdmap014_kgum_flag
+              , phmassxx_flag
+              ,station, bottle_id, datetime, depth, _recordnr, _short_filename, _path
+         from (select * from import.nioz where datetime <> '-999') sub
      )sub2
     where sub2.cvalue is not null and sub2.cvalue <> '-999'
 ) rd
-left join import.mapping_nioz m on m.originalName = rd.cname
+left join import.mapping_nioz m on m.originalname = rd.cname
 join nwdm.dataset ds on ds."path"=rd."_path" and ds.short_filename=rd."_short_filename"
 join nwdm.location loc on lower(loc.location_code) = 'nioz_'||lower(rd.station) and loc.data_owner='NIOZ'
 join nwdm.quality qua on qua.code = rd.flag and qua.use_data=true
