@@ -11,7 +11,7 @@ connection = engine.connect()
 # collect all the sensors names
 query = 'select distinct loc from nwdm.import.donar_sioene;'
 result = connection.execute(text(query)).fetchall()
-result = [r[0] for r in result][:1]
+result = [r[0] for r in result]
 #result = ["NOORDWK20", "ALMLO"]
 start_dates = []
 for r in result:
@@ -77,9 +77,7 @@ print(data)
 # make a dataframe with the data
 df = pd.concat(all_data)
 df['cpm'] = 10
-print(df)
-# save the dataframe to a csv file
-df.to_csv(r"silica_data.csv", index=False)
+
 
 
 
