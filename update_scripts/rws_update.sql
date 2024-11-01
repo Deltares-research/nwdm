@@ -1,28 +1,34 @@
---
+-- count the number of the old measurements
+select count(*) from nwdm.measurement m join nwdm.dataset d on d.dataset_id =m.dataset_id  where d.data_owner ='Rijkswaterstaat'
+; --1051800
+-- create backup
+select m.* into nwdm._backup_measurement_rws from nwdm.measurement m join nwdm.dataset d on d.dataset_id =m.dataset_id  where d.data_owner ='Rijkswaterstaat';
+select d.* into nwdm._backup_dataset_rws from nwdm.dataset d where d.data_owner ='Rijkswaterstaat';
+select l.* into nwdm._backup_location_rws from nwdm.location l  where l.data_owner ='Rijkswaterstaat';
 
 
---0. data_owners
+
+--0. data_owners - during the update this line of code should not be run again.
 insert into nwdm.data_owner (data_owner,priority) values ('Rijkswaterstaat',1) on conflict do nothing ;
 
 
---1. dataset nwdm thredds
+--1. dataset nwdm rws
 insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
-select row_number() over (order by _path,"_short_filename") dataset_id
-, replace(_short_filename, '.csv', '') as dataset_name
+select row_number() over (order by _path,"_short_filename") dataset_id --TODO: what is the shortfilename?
+, replace(_short_filename, '.csv', '') as dataset_name --TODO: what is shortfilename
 ,"_short_filename" short_filename
 , "_path" "path"
 , _path ||'\'||"_short_filename" as file
 , count(*) number_of_records
 , 'Rijkswaterstaat' data_holder
 , 'Rijkswaterstaat' data_owner
-, case 	when _path ilike '%noordzee%' then 'https://watersysteemdata.deltares.nl/thredds/catalog/watersysteemdata/Noordzee/ddl/raw/catalog.html'
-		when _path ilike '%wadden%' then 'https://watersysteemdata.deltares.nl/thredds/catalog/watersysteemdata/Wadden/ddl/raw/catalog.html'
-		end link_to_data
-, 'https://www.nationaalgeoregister.nl/geonetwork/srv/dut/catalog.search#/metadata/adw8xaji-ifam-4wnx-pu8g-oszpnerke8yo' link_to_metadata
+, 'https://repos.deltares.nl/repos/Wozep/trunk/NWDM/nioz_data' link_to_data --TODO: add the correct link to data
+, 'https://www.nationaalgeoregister.nl/geonetwork/srv/dut/catalog.search#/metadata/adw8xaji-ifam-4wnx-pu8g-oszpnerke8yo' link_to_metadata --TODO: add the correct link to metadata
 from import.rawdata
 group by "_short_filename", "_path"
 ;
---1b. dataset donar
+
+--1b. dataset ddlpy
 insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
 select 50000+row_number() over (order by _path,"_short_filename") dataset_id
 , replace(_short_filename, '.csv', '') as dataset_name
@@ -57,22 +63,18 @@ from (
 ) g where st_contains((select geom from nwdm.scope_northsea),g.geom);
 ;
 --1.locations donar
-insert into nwdm.location(location_code, location_name,x,y,epsg,geom,data_owner)
+insert into nwdm.location(location_code, location_name,x,y,epsg,geom, data_owner)
 select *
 from (
     select distinct
-    -- rd.gbd || '_' || dense_rank() over (partition by rd.gbd order by rd.loc_x,rd.loc_y)::varchar as location_code
-    'donar_'|| rd.loc as location_code
-    , rd.loc as location_name
-    , st_x(rd.geom)::decimal as x	-- zie onder tbv transform
-    , st_y(rd.geom)::decimal as y	-- zie onder tbv transform
-    , st_srid(rd.geom)::int as epsg	-- zie onder tbv transform
-    , rd.geom
+     'ddl_'|| rd.code as location_code
+    , rd.naam as location_name
+    , rd.x::decimal as x	-- zie onder tbv transform
+    , rd.y::decimal as y	-- zie onder tbv transform
+    , rd.coordinatenstelsel::int as epsg	-- zie onder tbv transform
+    , st_transform(st_setsrid(st_makepoint(rd.x::decimal, rd.y::decimal), rd.coordinatenstelsel::int), 4326) as geom
     , ds.data_owner
-    from (select *
-        , st_transform(st_setsrid(st_makepoint(loc_x::decimal/100, loc_y::decimal/100), 28992::int), 4326) as geom
-        from import.donar_sioene
-        ) rd
+    from import.rwsddlpydata rd
     join nwdm.dataset ds on ds."path"=rd."_path" and ds.short_filename=rd."_short_filename"
 ) g where st_contains((select geom from nwdm.scope_northsea),g.geom);
 ;
@@ -114,33 +116,34 @@ join nwdm.parameter par01 on par01.code = map01.sdn_p01_code
 where (numeriekewaarde not in ('NA','999999999999','-9999','-99') and numeriekewaarde is not null)
 ;
 
---1b. observations DONAR
---insert into nwdm.measurement (recordnr_dataset, dataset_id, location_id, "date", "depth", vertical_reference_id, parameter_id, unit_id, value, quality_id)
+--1b. observations ddlpy
+insert into nwdm.measurement (recordnr_dataset, dataset_id, location_id, "date", "depth", vertical_reference_id, parameter_id, unit_id, value, quality_id)
 select
-rd."_recordnr" as recordnr_dataset		-- TO DO: rename...?
+rd."_recordnr" as recordnr_dataset		
 , ds.dataset_id as dataset_id
 , loc.location_id
-,(rd.datum::date + replace(replace(rd.tijd,'''',''),'T',' ')::time)::timestamp as "date" --TODO: pre-process the data to have it as date with python already.
-,case when rd.plt_bmh::decimal <> -999999999 then rd.plt_bmh::decimal/-100.0 end as depth     -- rws always measures in cm, we use meters (at sea level: bigger is deeper) --pre-process in python
-j, vr.vertical_reference_id
+, rd.datetime::timestamp as "date"
+,case when waarnemingmetadata_bemonsteringshoogtelijst::decimal <> -999999999 then waarnemingmetadata_bemonsteringshoogtelijst::decimal/-100.0 end as depth     -- rws meet altijd in cm, wij hanteren meter (bij sea level: groter is dieper)
+, vr.vertical_reference_id
 , par01.parameter_id as parameter_id
 , un.unit_id as unit_id
-,case when rd.waarde in ('NA','999999999999') then null::decimal else rd.waarde::decimal end as value
+,case when meetwaarde_waarde_numeriek  in ('NA','999999999999','-9999') then null::decimal else meetwaarde_waarde_numeriek ::decimal end as value
 , qua.quality_id as quality_id
---select count(*)			--77391
-from import.donar_sioene rd
+-- select *		-- select count(*)			--1426661
+from import.rwsddlpydata rd
 join nwdm.dataset ds on ds."path"=rd."_path" and ds.short_filename=rd."_short_filename"
-join nwdm.location loc on loc.location_code = 'donar_'||rd.loc and loc.data_owner='Rijkswaterstaat'
-left join import.mapping_sdn_l201 map201 on map201.aquo_kwaliteitsoordeel_code = rd.kwc		--KWC
+join nwdm.location loc on loc.location_code = rd.code and loc.data_owner='Rijkswaterstaat'
+left join import.mapping_sdn_l201 map201 on map201.aquo_kwaliteitsoordeel_code = rd.waarnemingmetadata_kwaliteitswaardecodelijst
 join nwdm.quality qua on qua.code = map201.sdn_l201_code and qua.use_data=true
-left join nwdm.vertical_reference vr on vr.source_code = rd.plt_refvlak
-left join import.mapping_unit mun on mun.eenheid_code = rd.ehd --and coalesce(mun.grootheid_code,rd.grootheid_code) = rd.grootheid_code		-- EHD , geen grootheid
+left join nwdm.vertical_reference vr on vr.source_code = rd.waarnemingmetadata_referentievlaklijst
+left join import.mapping_unit mun on mun.eenheid_code = rd.eenheid_code  and coalesce(mun.grootheid_code,rd.grootheid_code) = rd.grootheid_code
 left join nwdm.unit un on un.code = mun.sdn_code
-left join import.mapping_sdn_p01 map01 	-- --> 
-on coalesce(map01.donar_par, 'NVT') = rd.par		--SiO2
-and map01.donar_hdh = rd.hdh			--Sinf
-and map01.donar_cpm = rd.cpm			-- 10
+left join import.mapping_sdn_p01 map01
+	on map01.aquo_grootheid_code = rd.grootheid_code
+	and coalesce(map01.aquo_chemischestof_code, 'NVT') = rd.parameter_code
+	and map01.aquo_hoedanigheid_code = rd.hoedanigheid_code
+--	and map01.aquo_biotaxon_code = rd.biotaxon_code		-- nooit anders dan "NVT"
+	and map01.aquo_compartiment_code = rd.compartiment_code
 join nwdm.parameter par01 on par01.code = map01.sdn_p01_code
-where (rd.waarde not in ('NA','999999999999', '-99') and rd.waarde is  not null)
+where (meetwaarde_waarde_numeriek  not in ('NA','999999999999','-9999','-99') and meetwaarde_waarde_numeriek  is not null)
 ;
--- the code is the P01 SLCAAAD1

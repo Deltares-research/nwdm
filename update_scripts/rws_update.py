@@ -4,7 +4,7 @@ from sqlalchemy.sql import text
 import ddlpy
 import datetime as dt
 import pandas as pd
-import geopandas as gpd
+#import geopandas as gpd
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -14,7 +14,7 @@ import utils
 #############################################################
 # Connect to the database
 
-cf_file = r"C:\develop\nwdm\configuration.txt"
+cf_file = r"C:\Users\micha\Documents\GitHub\nwdm\update_scripts\configuration.txt"
 cf = utils.read_config(cf_file)
 connstr = (
     "postgresql+psycopg2://"
@@ -94,23 +94,27 @@ for i in range(0,len(filtered_nwdm_location_df)):
     else:
         print(f"Data for location {filtered_nwdm_location_df.iloc[i]['Code']}")
         measurements.append(location_measurements_df)
-if len(measurements) > 0:       
-    measurements_df = pd.concat(measurements)
-        
-   
+  
+measurements_df = pd.concat(measurements)
+#dump the dataframe to an excel
+measurements_df.to_csv("measurements.csv")
 
-############################################################
-# TODO: check if the datetime is in the appropriate format
-# TODO: rename the columns all to lower case and without dots
-# TODO: check how the location was registered in the old database. 
-# TODO: check what needs to be altered to the location table
+#make all columns names lower case and replace the . with _
+measurements_df.columns = measurements_df.columns.str.lower().str.replace(".", "_")
 
-############################################################
-# gdf = gpd.GeoDataFrame(renamed_measurements, geometry=gpd.points_from_xy(measurements['X'], measurements['Y']))
-#         # set the crs to epsg=25831
-# gdf.crs = "EPSG:25831"
-#         # transform the dataframe from 25831 to 28992
-# gdf = gdf.to_crs(epsg=28992)
+measurements_df["_short_filename"] = "https://deltares.github.io/ddlpy"
+measurements_df["_path"] = "https://deltares.github.io/ddlpy"   
+measurements_df["datetime"]=measurements_df.index
+#ensure all values in the columns are strings
+measurements_df = measurements_df.astype(str)
+
+#add the recordnr to be equal to the number row
+measurements_df["_recordnr"] = range(1, len(measurements_df) + 1)
+# dumb the dataframe to the database in a table named nwdm.rwsddlpydata
+measurements_df.to_sql('rwsddlpydata', engine, schema='import', if_exists='replace', index=False)
+
+
+
         
 
 
