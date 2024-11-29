@@ -1,52 +1,41 @@
+select count(*) from import.ices
+
 --0. data_owners
 insert into nwdm.data_owner (data_owner,priority) values ('ICES',11) on conflict do nothing ;
 
-
--- --9. ices dataset
--- delete from nwdm.measurement where dataset_id in (select dataset_id from nwdm.dataset where data_owner='ICES');
--- delete from nwdm.dataset where data_owner='ICES';
+--1. administration of source
 insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
-select 700000 + row_number() over (order by table_name) dataset_id
-, table_name as dataset_name
-,"_short_filename" short_filename
-, s."_path"
-, _short_filename as file
+select 700000 dataset_id
+, 'table_name' as dataset_name
+,null short_filename
+, null "_path"
+, null as file
 , null number_of_records
 , 'ICES' data_holder
 , 'ICES' data_owner
 , 'https://www.ices.dk/data' link_to_data
 , 'https://gis.ices.dk/geonetwork/srv/eng/catalog.search#/search?facet.q=type%2Fdataset%26orgName%2FICES' link_to_metadata
-from (
-    select * from (select _short_filename, _path,  'ices_0763' as table_name from import.ices_0763 limit 1) x union all
-    select * from (select _short_filename, _path, 'ices_0676' as table_name from import.ices_0676 limit 1) x union all
-    select * from (select _short_filename, _path, 'ices_1921' as table_name from import.ices_1921 limit 1) x union all
-    select * from (select _short_filename, _path, 'ices_2086' as table_name from import.ices_2086 limit 1) x union all
-    select * from (select _short_filename, _path, 'ices_5227' as table_name from import.ices_5227 limit 1) x
-) s;
 
---
--- --9. ices locations
--- delete from nwdm.location where data_owner='PML';
--- insert into nwdm.location(location_code, location_name,x,y,epsg,geom,data_owner)
--- select *
--- from (
---     select
---     'pml_'|| rd._recordnr as location_code
---     , coalesce(rd.station, 'station'||rd._recordnr::varchar) as location_name
---     , (rd.x)::decimal as x
---     , (rd.y)::decimal as y
---     , 4326::int as epsg
---     , st_setsrid(st_makepoint(x,y), 4326::int) as geom
---     , 'ICES' data_owner
---     from (
---         select *
---         , (case when longitude_dec_degrees > 40.0 and latitude_dec_degrees < 0.0 then latitude_dec_degrees else longitude_dec_degrees end)::decimal x
---         , (case when longitude_dec_degrees > 40.0 and latitude_dec_degrees < 0.0 then longitude_dec_degrees else latitude_dec_degrees end)::decimal y
---                 from import.ices...
---     ) rd
---     -- where not(rd.x::decimal between 9.0 and 43.0 and rd.y::decimal between 9.0 and 43.0)        -- weglaten locaties rondom Corsica
--- ) g where st_contains((select geom from nwdm.scope_northsea),g.geom)
--- ;
+
+--11. ices locations
+delete from nwdm.location where data_owner='ICES';
+insert into nwdm.location(location_code, location_name,x,y,epsg,geom,data_owner)
+select *
+from (
+    select
+     'ices_'||cruise as location_code  -- check if this needs to be a unique number
+    , coalesce(station, 'station'||cruise::varchar) as location_name
+    , (rd.lon)::decimal as x
+    , (rd.lat)::decimal as y
+    , 4326::int as epsg
+    , st_setsrid(st_makepoint(lon,lat), 4326::int) as geom
+    , 'ICES' data_owner
+    from (	select distinct cruise, station, lat, lon
+            from import.ices
+    ) rd
+) g where st_contains((select geom from nwdm.scope_northsea),g.geom);
+
+
 --
 --
 --
