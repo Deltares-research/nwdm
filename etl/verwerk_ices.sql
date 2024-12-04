@@ -7,7 +7,7 @@ insert into nwdm.data_owner (data_owner,priority) values ('ICES',11) on conflict
 insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
 select 700000 dataset_id
 , 'table_name' as dataset_name
-,null short_filename
+, null short_filename
 , null "_path"
 , null as file
 , null number_of_records
@@ -23,7 +23,7 @@ insert into nwdm.location(location_code, location_name,x,y,epsg,geom,data_owner)
 select *
 from (
     select
-     'ices_'||cruise as location_code  -- check if this needs to be a unique number
+     'ices_'||cruise||'_'||(row_number() over ())::text as location_code  -- check if this needs to be a unique number
     , coalesce(station, 'station'||cruise::varchar) as location_name
     , (rd.lon)::decimal as x
     , (rd.lat)::decimal as y
