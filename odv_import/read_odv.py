@@ -1,5 +1,5 @@
 from os import name, replace
-from numpy import NaN, inner
+# from numpy import NaN, inner
 import numpy as np
 import pandas as pd
 from pandas.core.dtypes.missing import notna
@@ -13,9 +13,12 @@ from itertools import islice
 
 # variables
 begin_time = datetime.datetime.now()
-odv_file = r'd:\nwdm_data\emodnet\North_Sea_eutrophication_and_acidity_aggregated_v2018_2.txt_corrected.odv'
+# odv_file = r'd:\nwdm_data\emodnet\North_Sea_eutrophication_and_acidity_aggregated_v2018_2.txt_corrected.odv'
 # odv_file = r'd:\nwdm_data\emodnet\test.odv'
-cname1_subset = 'Depth [m]'
+# odv_file = r'D:\data\nwdm\EMD_Eutrophication_NorthSea_2022_unrestricted\Eutrophication_NorthSea_nutrient_timeseries_2022_unrestricted.txt'
+odv_file = r'D:\data\nwdm\EMD_Eutrophication_NorthSea_2022_unrestricted\test_nt.txt'
+# cname1_subset = 'Depth [m]'
+cname1_subset = 'time_ISO8601'
 cname_p01 = 'P01 Codes'
 main_keycols = ["LOCAL_CDI_ID", "EDMO_code"]
 mainid = '_mainid'
@@ -26,7 +29,7 @@ startline_data = 0
 # str2correct = 'Chemical 	oceanography'
 
 # db connection
-engine = create_engine('postgresql://pg:pg@localhost:5432/emodnet')
+engine = create_engine('postgresql://postgres:pg@localhost:5432/emodnet')
 db_schema = 'odv'
 conn = engine.connect()
 
@@ -62,10 +65,11 @@ df_columns_per_line = pd.DataFrame(columns=['linenr','columns'])
 with open(odv_file) as f:
     for linenr,line in islice(enumerate(f), startline_data, None):
         columns_in_line = line.count('\t') + 1
+        # print(columns_in_line)
         if(columns_in_line != nr_data_columns):
             df_columns_per_line = df_columns_per_line.append({'linenr':linenr+1,'columns':columns_in_line}, ignore_index=True)
 f.close()
-df_columns_per_line.to_sql('columns_per_line', engine, schema=db_schema, if_exists='replace', index=False)
+df_columns_per_line.to_sql('columns_per_line', engine, schema=db_schema, if_exists='replace', index=False, method='multi')
 print(df_columns_per_line)
 
 show_time('analyse columns')
@@ -74,8 +78,13 @@ show_time('analyse columns')
 # read file and put it in dataframe
 df = pd.read_csv(odv_file,delimiter="\t", engine='python', skiprows=range(0,startline_data), header=0,)
 
+# print columns subset
+print(df.columns)
+
 # bepaal grens hoofd- en subset
 cnr1_subset = df.columns.get_loc(cname1_subset)
+
+print(cnr1_subset)
 
 # bepaal columns hoofdset
 maincols = df.iloc[:,:cnr1_subset].columns
@@ -113,8 +122,9 @@ for sc_name in df_sub.columns:
         sc_qualname = df_sub.columns[cqual_nr]
 
         # fill df_vars
-        di_vars = {'variable':sc_name}
-        df_vars = df_vars.append(di_vars,ignore_index=True)
+        di_vars = {'variable': sc_name}
+        # df_vars = df_vars.append(di_vars,ignore_index=True)
+        df_vars = pd.concat([df_vars, pd.DataFrame([di_vars])], ignore_index=True)
 
         # melt variable value + quality indicator
         mc = sub_keycols + [sc_name, sc_qualname]
@@ -128,6 +138,7 @@ for sc_name in df_sub.columns:
         dfv = dfv.set_index(sub_keycols)
         dfqv = dfv.join(dfq.set_index(sub_keycols), on=sub_keycols, rsuffix='_q').drop(columns=['variable_q']).rename(columns={'value_q':'quality'})
         df_obs = df_obs.append(dfqv)
+        # df_obs = pd.concat([df_obs, pd.DataFrame([dfqv])])
 
 # convert variable to _varid
 df_vars.index.name='_varid'
