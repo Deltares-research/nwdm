@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright notice
 #   --------------------------------------------------------------------
-#   Copyright (C) 2022 Deltares
+#   Copyright (C) 2024 Deltares
 #       Gerrit Hendriksen
 #       Gerrit Hendriksen@deltares.nl
 #
@@ -39,8 +39,12 @@ from sqlalchemy.orm import DeclarativeBase
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import utils
 
+localdev = False
+if localdev:
+    cf_file = r"C:\develop\nwdm\configuration.txt"
+else:
+    cf_file = r"C:\develop\nwdm\configuration_nwdm.txt"
 
-cf_file = r"C:\develop\nwdm\configuration.txt"
 cf = utils.read_config(cf_file)
 connstr = (
     "postgresql+psycopg2://"
@@ -57,11 +61,6 @@ session, engine = utils.establish_connection(None, connstr)
 # setting up mapping table
 metadata_obj = MetaData(schema="import")
 
-stmt = """drop table if exists import.ices"""
-with engine.connect() as conn:
-    conn.execute(text(stmt))
-    conn.commit()
-
 class Base(DeclarativeBase):
     metadata = metadata_obj
 
@@ -71,9 +70,10 @@ class mapping(Base):
     icescolumn = Column(String(50))
     p01 = Column(String(10))
     p06 = Column(String(5))
+    p35 = Column(String(5))
     _short_filename = Column(String(50))
 
-class mapping(Base):
+class icesdata(Base):
     __tablename__ = 'ices'
     recordnr_dataset = Column(Integer, primary_key=True)
     cruise = Column(String(125))
@@ -105,15 +105,21 @@ class mapping(Base):
     slcazzxx_upox = Column(Float)
     qv_slcazzxx = Column(Float)
     ntrazzxx_upox = Column(Float)
-    qv_ntrazzx = Column(Float)
+    qv_ntrazzxx = Column(Float)
     phxxzzxx_uuph = Column(Float)
     qv_phxxzzxx = Column(Float)
-    chplzzxx_ugpl = Column(Float)
-    qv_cphllzzxx = Column(Float)
+    cphlzzxx_ugpl = Column(Float)
+    qv_cphlzzxx = Column(Float)
     cndczz01_ueca = Column(Float)
     qv_cndczz01 = Column(Float)
 
-Base.metadata.create_all(engine)
+# first check if it necessary if you need to create the tables
+if localdev:
+    # Base.metadata.drop_all(engine)
+    # Base.metadata.create_all(engine)
+else:
+    # Base.metadata.drop_all(engine)
+    # Base.metadata.create_all(engine)
 
 # connect to existing table with 
 META_DATA = MetaData(schema='nwdm')
@@ -126,6 +132,13 @@ quality = META_DATA.tables['nwdm.quality']
 # reading 21 Gb csv, needs be done chunck wise and column wise
 header = 12 # lines 
 chunksize = 10 ** 6
+
+# dropt the table if exists
+stmt = """drop table if exists import.ices"""
+with engine.connect() as conn:
+    conn.execute(text(stmt))
+    conn.commit()
+
 
 thecsv = r'C:\temp\nwdm\ICES_StationSamples_CTD_2024-07-10.csv'
 # only select data within 
@@ -147,20 +160,30 @@ lstparamters = ['adepzz01_ulaa',
                 'slcazzxx_upox',
                 'ntrazzxx_upox',
                 'phxxzzxx_uuph',
-                'cphlzzxx_ugpl',
-                'cndczz01_ueca']
+                'cphlzzxx_ugpl']
 i = 0
 for c in lstparamters:
     i=i+1
-    stmt = insert(mapping).values(icesid=i,
-                                  icescolumn=c,
-                                  p01=c.split('_')[0].upper(),
-                                  p06=c.split('_')[1].upper(),
-                                  _short_filename=os.path.basename(thecsv))
-    with engine.connect() as conn:
-        conn.execute(stmt)
-        conn.commit()
+    # first check if specific mapping already exists
+    r = session.query(mapping).filter_by(icescolumn=c).first()
+    msg = str(r)
+    try:
+        if str(r) == "None":
+            stmt = insert(mapping).values(icesid=i,
+                                        icescolumn=c,
+                                        p01=c.split('_')[0].upper(),
+                                        p06=c.split('_')[1].upper(),
+                                        _short_filename=os.path.basename(thecsv))
+            with engine.connect() as conn:
+                conn.execute(stmt)
+                conn.commit()
+            msg = ('added ices column '+ c+ ' to mapping table')
+    except:
+        msg("exception raised while retrieving/assigning item to mapping table, item is "+c)
+    finally:
+        print(msg)
 
+    
 ## 0. update data_owners
 strsql = """insert into nwdm.data_owner (data_owner,priority) values ('ICES',11) on conflict do nothing;"""
 with engine.connect() as conn:
@@ -209,7 +232,7 @@ from (
 	, rd.startyear as startyear
 	, rd.endyear as lastyear
     , 'ICES' data_owner
-    from (	select distinct cruise, station, lat, lon, count(*) as noobs, min(extract(year from time::timestamp)) as startyear, max(extract(year from time::timestamp)) as endyear
+    from (	select distinct cruise, station, lat, lon, count(*) as noobs, min(left(time,4)::int) as startyear, max(left(time,4)::int) as endyear
 			from import.ices
 			group by cruise, station, lat, lon
     ) rd
@@ -218,58 +241,69 @@ with engine.connect() as conn:
     conn.execute(text(strsql))
     conn.commit()    
 
-# update import.ices and add unique key that is used as recordnr_dataset
-strsql = """alter table import.ices add column recordnr_dataset serial"""
-with engine.connect() as conn:
-    conn.execute(text(strsql))
-    conn.commit() 
-
 # update per parameter the measurument table
 stmt = """delete from nwdm.measurement where dataset_id = 700000"""
 with engine.connect() as conn:
     conn.execute(text(stmt))
     conn.commit() 
 
+
+#set some indices on colums
+
 # the dataset is not consequent with respect to time notation
 # sometimes there are times like "1993-03-22T15Z" where it should at least be "1993-03-22T15:00Z"
 
 datasetid = 700000
 for param in lstparamters:
-    decparameter = param.split('_')[0].upper()
-    decunit = param.split('_')[1].upper()
-    idparam = session.query(parameter).filter_by(code=decparameter).first()
-    idunit  = session.query(unit).filter_by(code=decunit).first()
-    qualityclmn = 'qv_'+decparameter.lower()
-    stmt = f"""insert into nwdm.measurement (
-                recordnr_dataset, 
-                dataset_id, 
-                 
-                "depth", 
-                vertical_reference_id, 
-                parameter_id, 
-                unit_id, 
-                value, 
-                quality_id,
-                geom,
-                "date")
-              select 
-                recordnr_dataset, 
-                {datasetid},
-                bot_depth,
-                4,
-                {idparam.parameter_id},
-                {idunit.unit_id},
-                {param},
-                qv.quality_id,
-                st_setsrid(st_point(lon,lat),4326),
-                case
-                    when length(time) = 10 then (time||'T00:00Z')::timestamp
-                    when length(time) = 14 then replace(time,'Z','00Z')::timestamp
-                    else time::timestamp
-                end
-                from import.ices
-                join nwdm.quality qv on qv.code = {qualityclmn}::text 
-                where {param} is not null"""
-    with engine.connect() as conn:
-        conn.execute(text(stmt))
-        conn.commit()
+    if param != 'adepzz01_ulaa':
+        session, engine = utils.establish_connection(None, connstr)
+        decparameter = param.split('_')[0].upper()
+        decunit = param.split('_')[1].upper()
+        idparam = session.query(parameter).filter_by(code=decparameter).first()
+        idunit  = session.query(unit).filter_by(code=decunit).first()
+        qualityclmn = 'qv_'+decparameter.lower()
+        stmt = f"""insert into nwdm.measurement (recordnr_dataset, 
+                    location_id,
+                    dataset_id,                  
+                    "depth", 
+                    depth_quality_id,
+                    vertical_reference_id, 
+                    parameter_id, 
+                    unit_id, 
+                    value, 
+                    quality_id,
+                    geom,
+                    "date")
+                select 
+                    imp.recordnr_dataset, 
+                    l.location_id,
+                    {datasetid},
+                    imp.adepzz01_ulaa,
+                    qvd.quality_id,
+                    vr.vertical_reference_id,
+                    {idparam.parameter_id},
+                    {idunit.unit_id},
+                    {param}::numeric,
+                    {qualityclmn}::numeric,
+                    st_setsrid(st_point(lon,lat),4326),
+                    case
+                        when length(time) = 10 then (time||'T00:00Z')::timestamp
+                        when length(time) = 14 then replace(time,'Z','00Z')::timestamp
+                        else time::timestamp
+                    end
+                    from import.ices imp
+                    join nwdm.vertical_reference vr on vr.code = 'D08'
+                    join nwdm.quality qv on qv.code = {qualityclmn}::text 
+                    join nwdm.quality qvd on qvd.code = imp.qv_adepzz01::text
+                    join nwdm.location l on l.location_name = coalesce(imp.station, 'station'||imp.cruise::varchar) 
+                                                            and l.x = imp.lon::decimal and l.y = imp.lat::decimal 
+                    where {param} is not null"""
+        with engine.connect() as conn:
+            conn.execute(text(stmt))
+            conn.commit()
+
+        print('converted data for column ', param, ' to nwdm.measurements')    
+        session.close()
+        engine.dispose()
+
+ 
