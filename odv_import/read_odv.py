@@ -13,12 +13,13 @@ from itertools import islice
 
 # variables
 begin_time = datetime.datetime.now()
-# odv_file = r'd:\nwdm_data\emodnet\North_Sea_eutrophication_and_acidity_aggregated_v2018_2.txt_corrected.odv'
-# odv_file = r'd:\nwdm_data\emodnet\test.odv'
+# odv_file = r'D:\data\nwdm\EMD_Eutrophication_NorthSea_2022_unrestricted\Eutrophication_NorthSea_non-nutrient_profiles_2022_unrestricted.txt'
+odv_file = r'D:\data\nwdm\EMD_Eutrophication_NorthSea_2022_unrestricted\Eutrophication_NorthSea_non-nutrient_timeseries_2022_unrestricted.txt'
+# odv_file = r'D:\data\nwdm\EMD_Eutrophication_NorthSea_2022_unrestricted\Eutrophication_NorthSea_nutrient_profiles_2022_unrestricted.txt'
 # odv_file = r'D:\data\nwdm\EMD_Eutrophication_NorthSea_2022_unrestricted\Eutrophication_NorthSea_nutrient_timeseries_2022_unrestricted.txt'
-odv_file = r'D:\data\nwdm\EMD_Eutrophication_NorthSea_2022_unrestricted\test_nt.txt'
 # cname1_subset = 'Depth [m]'
 cname1_subset = 'time_ISO8601'
+# cname1_subset = ""
 cname_p01 = 'P01 Codes'
 main_keycols = ["LOCAL_CDI_ID", "EDMO_code"]
 mainid = '_mainid'
@@ -30,7 +31,9 @@ startline_data = 0
 
 # db connection
 engine = create_engine('postgresql://postgres:pg@localhost:5432/emodnet')
-db_schema = 'odv'
+# engine = create_engine('postgresql://USER:WW@c-oet17813.directory.intra:5432/nwdm')
+# db_schema = 'odv'
+db_schema = 'import'
 conn = engine.connect()
 
 header_metavar = []
@@ -47,10 +50,14 @@ with open(odv_file) as f:
                 header_metavar.append(line)
             if(line.startswith('//<DataVariable>')):
                 header_datavar.append(line)
+                # if cname1_subset=="":
+                    # cname1_subset = line[line.find('"') + 1 : line.find('"', line.find('"') + 1)] if '"' in line else None
             startline_data = index
         else:
             break
 f.close()
+
+print('cname1_subset: ', cname1_subset)
 
 startline_data += 1
 nr_data_columns = len(header_metavar) + 1 + 2*len(header_datavar) + 1
@@ -181,10 +188,10 @@ if(list_vars_in_sample):
 
 # write to db
 # df.to_sql('df', engine, schema=db_schema, if_exists='replace', index=True)
-df_main.to_sql('sample', engine, schema=db_schema, if_exists='replace', index=False)
+df_main.to_sql('odv_sample2', engine, schema=db_schema, if_exists='replace', index=False)
 # df_sub.to_sql('df_sub', engine, schema=db_schema, if_exists='replace', index=False)
-df_obs.to_sql('observation', engine, schema=db_schema, if_exists='replace', index=False)
-df_vars.to_sql('variable', engine, schema=db_schema, if_exists='replace', index=False)
+df_obs.to_sql('odv_observation2', engine, schema=db_schema, if_exists='replace', index=False)
+df_vars.to_sql('odv_variable2', engine, schema=db_schema, if_exists='replace', index=False)
 
 show_time('wegschrijven in db')
 
