@@ -143,7 +143,7 @@ with engine.connect() as conn:
 # several csv
 lstfiles = [r'C:\temp\nwdm\ICES_StationSamples_CTD_2024-07-10.csv',
             r"C:\temp\nwdm\ICES_StationSamples_BOT_2024-07-10.csv",
-            r"C:\temp\nwdm\ICES_StationSamples_BOT_2024-07-10.csv"]
+            r"C:\temp\nwdm\ICES_StationSamples_PMP_2024-07-10.csv"]
 
 # only select data within 
 # "BOX(-15.304392 42.875958,13.278998 64.098841)"
@@ -205,6 +205,7 @@ def administratefile(lstfiles):
             if str(r) == 'None':
                 stmt = insert(dataset).values(
                             datasetid = basedsid += 1,
+                            dataset_name = os.path.basename(tbl),
                             data_holder = 'ICES',
                             data_owner = 'ICES',
                             link_to_data = 'https://www.ices.dk/data',
@@ -220,21 +221,21 @@ def administratefile(lstfiles):
             print(msg)            
 
 
-    datasetid = basedsid+i
-    strsql = """insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
-    select 700000 dataset_id
-    , 'ICES_StationSamples_CTD_2024-07-10.csv' as dataset_name
-    , 'null' as short_filename
-    , 'null' as "_path"
-    , 'null' as file
-    ,  null number_of_records
-    , 'ICES' as data_holder
-    , 'ICES' as data_owner
-    , 'https://www.ices.dk/data' as link_to_data
-    , 'https://gis.ices.dk/geonetwork/srv/eng/catalog.search#/search?facet.q=type%2Fdataset%26orgName%2FICES' as link_to_metadata"""
-    with engine.connect() as conn:
-        conn.execute(text(strsql))
-        conn.commit()    
+    # datasetid = basedsid+i
+    # strsql = """insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
+    # select 700000 dataset_id
+    # , 'ICES_StationSamples_CTD_2024-07-10.csv' as dataset_name
+    # , 'null' as short_filename
+    # , 'null' as "_path"
+    # , 'null' as file
+    # ,  null number_of_records
+    # , 'ICES' as data_holder
+    # , 'ICES' as data_owner
+    # , 'https://www.ices.dk/data' as link_to_data
+    # , 'https://gis.ices.dk/geonetwork/srv/eng/catalog.search#/search?facet.q=type%2Fdataset%26orgName%2FICES' as link_to_metadata"""
+    # with engine.connect() as conn:
+    #     conn.execute(text(strsql))
+    #     conn.commit()    
 
 strsql = """update nwdm.dataset set dataset_name = 'ICES_StationSamples_CTD_2024-07-10.csv' 
             where data_holder = 'ICES' and data_owner = 'ICES' """
@@ -338,7 +339,20 @@ for param in lstparamters:
 
  ## repetative for PMP
  thecsv = r"C:\temp\nwdm\ICES_StationSamples_PMP_2024-07-10.csv"
- lstparameter = ['adepzz01_ulaa','temppr01_upaa','psalpr01_uuuu','doxyzzxx_umll','phoszzxx_upox','tphszzxx_upox','slcazzxx_upox','ntrazzxx_upox','ntrizzxx_upox','amonzzxx_upox','ntotzzxx_upox','phxxzzxx_uuph','alkyzzxx_meql','cphlzzxx_ugpl']
+ lstparameter = ['adepzz01_ulaa',
+                'temppr01_upaa',
+                'psalpr01_uuuu',
+                'doxyzzxx_umll',
+                'phoszzxx_upox',
+                'tphszzxx_upox',
+                'slcazzxx_upox',
+                'ntrazzxx_upox',
+                'ntrizzxx_upox',
+                'amonzzxx_upox',
+                'ntotzzxx_upox',
+                'phxxzzxx_uuph',
+                'alkyzzxx_meql',
+                'cphlzzxx_ugpl']
  
  class icesdata_pmp(Base):
     __tablename__ = 'ices_pmp'
@@ -388,4 +402,67 @@ for param in lstparamters:
     cphlzzxx_ugpl = Column(Float)
     qv_cphlzzxx = Column(Float)
 
+# read pmp csv table , check columsn in the chunk.columns
+with pd.read_csv(thecsv, sep=',',header=12, dtype={1:'str'},chunksize=chunksize) as reader:
+    for chunk in reader:
+        chunk.columns=['cruise','station','type','time','lon','lat','bot_depth','secchi_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','slcazzxx_upox','qv_slcazzxx','ntrazzxx_upox','qv_ntrazzx','phxxzzxx_uuph','qv_phxxzzxx','chplzzxx_ugpl','qv_cphllzzxx','cndczz01_ueca','qv_condczz01']
+        chns = sqldf('''select * from chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
+        chns.to_sql('ices', engine,schema='import',if_exists='append',index=False)
 
+
+
+ class icesdata_pmp(Base):
+    __tablename__ = 'ices_bot'
+    recordnr_dataset = Column(Integer, primary_key=True)
+    cruise = Column(String(125))
+    station = Column(String(125))
+    type = Column(String(125))
+    time = Column(String(125))
+    lon  = Column(Float)
+    lat = Column(Float)
+    bot_depth = Column(Float)
+    secchi_depth = Column(Float)
+    device_cat = Column(Integer)
+    platform_code = Column(String(125))
+    distributor = Column(Integer)
+    custodian = Column(Integer)
+    originator = Column(String(125))
+    project_code = Column(String(125))
+    modified = Column(String(125))
+    guid = Column(DateTime)
+    adepzz01_ulaa = Column(Float)
+    qv_adepzz01 = Column(Float)
+# check rest of the columns
+    temppr01_upaa = Column(Float)
+    qv_temppr01 = Column(Float)
+    psalpr01_uuuu = Column(Float)
+    qv_psalpr01 = Column(Float)
+    doxyzzxx_umll = Column(Float) 
+    qv_doxyzzxx = Column(Float)
+    phoszzxx_upox = Column(Float)
+    qv_phoszzxx = Column(Float)
+    tphszzxx_upox = Column(Float)
+    qv_tphszzxx = Column(Float)
+    slcazzxx_upox = Column(Float)
+    qv_slcazzxx = Column(Float)
+    ntrazzxx_upox = Column(Float)
+    qv_ntrazzxx = Column(Float)
+    ntrizzxx_upox = Column(Float)
+    qv_ntrizzxx = Column(Float)
+    amonzzxx_upox = Column(Float)
+    qv_amonzzxx = Column(Float)
+    ntotzzxx_upox = Column(Float)
+    qv_ntotzzxx = Column(Float)
+    phxxzzxx_uuph = Column(Float)
+    qv_phxxzzxx = Column(Float)
+    alkyzzxx_meql = Column(Float)
+    qv_alkyzzxx = Column(Float)
+    cphlzzxx_ugpl = Column(Float)
+    qv_cphlzzxx = Column(Float)
+
+# read bot table , check columsn in the chunk.columns
+with pd.read_csv(thecsv, sep=',',header=12, dtype={1:'str'},chunksize=chunksize) as reader:
+    for chunk in reader:
+        chunk.columns=['cruise','station','type','time','lon','lat','bot_depth','secchi_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','slcazzxx_upox','qv_slcazzxx','ntrazzxx_upox','qv_ntrazzx','phxxzzxx_uuph','qv_phxxzzxx','chplzzxx_ugpl','qv_cphllzzxx','cndczz01_ueca','qv_condczz01']
+        chns = sqldf('''select * from chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
+        chns.to_sql('ices', engine,schema='import',if_exists='append',index=False)
