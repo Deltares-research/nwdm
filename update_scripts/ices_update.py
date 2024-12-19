@@ -39,7 +39,7 @@ from sqlalchemy.orm import DeclarativeBase
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import utils
 
-localdev = False
+localdev = True
 if localdev:
     cf_file = r"C:\develop\nwdm\configuration.txt"
 else:
@@ -124,6 +124,7 @@ else:
 # connect to existing table with 
 META_DATA = MetaData(schema='nwdm')
 META_DATA.reflect(engine)
+dataset = META_DATA.tables['nwdm.dataset']
 parameter = META_DATA.tables['nwdm.parameter']
 unit = META_DATA.tables['nwdm.unit']
 quality = META_DATA.tables['nwdm.quality']
@@ -139,8 +140,11 @@ with engine.connect() as conn:
     conn.execute(text(stmt))
     conn.commit()
 
+# several csv
+lstfiles = [r'C:\temp\nwdm\ICES_StationSamples_CTD_2024-07-10.csv',
+            r"C:\temp\nwdm\ICES_StationSamples_BOT_2024-07-10.csv",
+            r"C:\temp\nwdm\ICES_StationSamples_BOT_2024-07-10.csv"]
 
-thecsv = r'C:\temp\nwdm\ICES_StationSamples_CTD_2024-07-10.csv'
 # only select data within 
 # "BOX(-15.304392 42.875958,13.278998 64.098841)"
 # via the sqldf package the subsetting is set up, then store the data in temp data part
@@ -161,27 +165,29 @@ lstparamters = ['adepzz01_ulaa',
                 'ntrazzxx_upox',
                 'phxxzzxx_uuph',
                 'cphlzzxx_ugpl']
-i = 0
-for c in lstparamters:
-    i=i+1
-    # first check if specific mapping already exists
-    r = session.query(mapping).filter_by(icescolumn=c).first()
-    msg = str(r)
-    try:
-        if str(r) == "None":
-            stmt = insert(mapping).values(icesid=i,
-                                        icescolumn=c,
-                                        p01=c.split('_')[0].upper(),
-                                        p06=c.split('_')[1].upper(),
-                                        _short_filename=os.path.basename(thecsv))
-            with engine.connect() as conn:
-                conn.execute(stmt)
-                conn.commit()
-            msg = ('added ices column '+ c+ ' to mapping table')
-    except:
-        msg("exception raised while retrieving/assigning item to mapping table, item is "+c)
-    finally:
-        print(msg)
+
+def maplstparameters(lstparameters):
+    i = 0
+    for c in lstparamters:
+        i=i+1
+        # first check if specific mapping already exists
+        r = session.query(mapping).filter_by(icescolumn=c).first()
+        msg = str(r)
+        try:
+            if str(r) == "None":
+                stmt = insert(mapping).values(icesid=i,
+                                            icescolumn=c,
+                                            p01=c.split('_')[0].upper(),
+                                            p06=c.split('_')[1].upper(),
+                                            _short_filename=os.path.basename(thecsv))
+                with engine.connect() as conn:
+                    conn.execute(stmt)
+                    conn.commit()
+                msg = ('added ices column '+ c+ ' to mapping table')
+        except:
+            msg("exception raised while retrieving/assigning item to mapping table, item is "+c)
+        finally:
+            print(msg)
 
     
 ## 0. update data_owners
@@ -191,20 +197,44 @@ with engine.connect() as conn:
     conn.commit()    
 
 ## 1. update administration of source - dataset id
-strsql = """insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
-select 700000 dataset_id
-, 'ICES_StationSamples_CTD_2024-07-10.csv' as dataset_name
-, 'null' as short_filename
-, 'null' as "_path"
-, 'null' as file
-,  null number_of_records
-, 'ICES' as data_holder
-, 'ICES' as data_owner
-, 'https://www.ices.dk/data' as link_to_data
-, 'https://gis.ices.dk/geonetwork/srv/eng/catalog.search#/search?facet.q=type%2Fdataset%26orgName%2FICES' as link_to_metadata"""
-with engine.connect() as conn:
-    conn.execute(text(strsql))
-    conn.commit()    
+def administratefile(lstfiles):
+    basedsid = 700000  
+    for tbl in lstfiles:
+        r = session.query(dataset).filter_by(dataset_name=os.path.basename(tbl)).first()
+        try:
+            if str(r) == 'None':
+                stmt = insert(dataset).values(
+                            datasetid = basedsid += 1,
+                            data_holder = 'ICES',
+                            data_owner = 'ICES',
+                            link_to_data = 'https://www.ices.dk/data',
+                            link_to_metadata = 'https://gis.ices.dk/geonetwork/srv/eng/catalog.search#/search?facet.q=type%2Fdataset%26orgName%2FICES'
+                )
+                with engine.connect() as conn:
+                                    conn.execute(stmt)
+                                    conn.commit()
+            msg = ('added ices column '+ os.path.basename(tbl)+ ' to dataset table')
+        except:
+            msg("exception raised while retrieving/assigning item to mapping table, item is "+c)
+        finally:
+            print(msg)            
+
+
+    datasetid = basedsid+i
+    strsql = """insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
+    select 700000 dataset_id
+    , 'ICES_StationSamples_CTD_2024-07-10.csv' as dataset_name
+    , 'null' as short_filename
+    , 'null' as "_path"
+    , 'null' as file
+    ,  null number_of_records
+    , 'ICES' as data_holder
+    , 'ICES' as data_owner
+    , 'https://www.ices.dk/data' as link_to_data
+    , 'https://gis.ices.dk/geonetwork/srv/eng/catalog.search#/search?facet.q=type%2Fdataset%26orgName%2FICES' as link_to_metadata"""
+    with engine.connect() as conn:
+        conn.execute(text(strsql))
+        conn.commit()    
 
 strsql = """update nwdm.dataset set dataset_name = 'ICES_StationSamples_CTD_2024-07-10.csv' 
             where data_holder = 'ICES' and data_owner = 'ICES' """
@@ -306,4 +336,56 @@ for param in lstparamters:
         session.close()
         engine.dispose()
 
+ ## repetative for PMP
+ thecsv = r"C:\temp\nwdm\ICES_StationSamples_PMP_2024-07-10.csv"
+ lstparameter = ['adepzz01_ulaa','temppr01_upaa','psalpr01_uuuu','doxyzzxx_umll','phoszzxx_upox','tphszzxx_upox','slcazzxx_upox','ntrazzxx_upox','ntrizzxx_upox','amonzzxx_upox','ntotzzxx_upox','phxxzzxx_uuph','alkyzzxx_meql','cphlzzxx_ugpl']
  
+ class icesdata_pmp(Base):
+    __tablename__ = 'ices_pmp'
+    recordnr_dataset = Column(Integer, primary_key=True)
+    cruise = Column(String(125))
+    station = Column(String(125))
+    type = Column(String(125))
+    time = Column(String(125))
+    lon  = Column(Float)
+    lat = Column(Float)
+    bot_depth = Column(Float)
+    secchi_depth = Column(Float)
+    device_cat = Column(Integer)
+    platform_code = Column(String(125))
+    distributor = Column(Integer)
+    custodian = Column(Integer)
+    originator = Column(String(125))
+    project_code = Column(String(125))
+    modified = Column(String(125))
+    guid = Column(DateTime)
+    adepzz01_ulaa = Column(Float)
+    qv_adepzz01 = Column(Float)
+    temppr01_upaa = Column(Float)
+    qv_temppr01 = Column(Float)
+    psalpr01_uuuu = Column(Float)
+    qv_psalpr01 = Column(Float)
+    doxyzzxx_umll = Column(Float) 
+    qv_doxyzzxx = Column(Float)
+    phoszzxx_upox = Column(Float)
+    qv_phoszzxx = Column(Float)
+    tphszzxx_upox = Column(Float)
+    qv_tphszzxx = Column(Float)
+    slcazzxx_upox = Column(Float)
+    qv_slcazzxx = Column(Float)
+    ntrazzxx_upox = Column(Float)
+    qv_ntrazzxx = Column(Float)
+    ntrizzxx_upox = Column(Float)
+    qv_ntrizzxx = Column(Float)
+    amonzzxx_upox = Column(Float)
+    qv_amonzzxx = Column(Float)
+    ntotzzxx_upox = Column(Float)
+    qv_ntotzzxx = Column(Float)
+    phxxzzxx_uuph = Column(Float)
+    qv_phxxzzxx = Column(Float)
+    alkyzzxx_meql = Column(Float)
+    qv_alkyzzxx = Column(Float)
+    cphlzzxx_ugpl = Column(Float)
+    qv_cphlzzxx = Column(Float)
+
+
