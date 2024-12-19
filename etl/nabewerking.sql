@@ -1,6 +1,7 @@
 -- nabewerking
 -- create index if not exists ix_location_id on nwdm.measurement(location_id);
 -- create index if not exists ix_measurement_geom on nwdm.measurement using gist(geom);
+-- create index if not exists ix_parameter_id on nwdm.measurement(parameter_id);
 
 -- verwijder negatieve waarden
 delete
@@ -14,6 +15,8 @@ and (
 )
 ;
 
+
+create index if not exists ix_unit_id on nwdm.measurement(unit_id, parameter_id);
 -- unit conversie: dezelfde parameters omrekenen naar dezelfde unit
 update nwdm.measurement m       -- 11m34s
 set unit_id=u2.unit_id, value = m.value*cu.multiplication_factor_to_preferred_unit::decimal
@@ -25,7 +28,7 @@ and cu.p35code=p.p35code and cu.unit_code=u.code and cu.unit_code<>cu.preferred_
 AND cu.preferred_unit is not null AND cu.multiplication_factor_to_preferred_unit is not null
 ;
 
--- dubbele metingen markeren:
+-- dubbele metingen markeren:       -- 10min
 update nwdm.measurement set redundant = true where measurement_id in (
     select measurement_id
     from (
@@ -46,8 +49,9 @@ update nwdm.measurement set redundant = true where measurement_id in (
     where x._nr > 1
 )
 ;
-
-create index ix_meas on nwdm.measurement(measurement_id,dataset_id, location_id, parameter_id, depth, date,value);
+--------
+create index if not exists ix_meas on nwdm.measurement(measurement_id,dataset_id, location_id, parameter_id, depth, date,value);
+drop table if exists nwdm._temp_red_overig;
 -- dubbel in emodnet in vergelijking met andere bron (op p35-niveau): voorbereiding
 select m.measurement_id, l.geom, p.p35code, m.depth, m.date, m.value
 into nwdm._temp_red_overig  -- 6m
