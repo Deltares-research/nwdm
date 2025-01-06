@@ -24,6 +24,7 @@
 # programming tools in an open source, version controlled environment.
 # Sign up to recieve regular updates of this function, and to contribute
 # your own tools.
+#%%
 """
 Load and pre-process the data from ICES 
 """
@@ -34,6 +35,7 @@ from pandasql import sqldf
 from sqlalchemy import text, Table, Column, String, Integer, MetaData, DateTime, Float, insert, select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import DeclarativeBase
+import re
 
 # add the path to the sys.path
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -41,7 +43,8 @@ import utils
 
 localdev = True
 if localdev:
-    cf_file = r"C:\develop\nwdm\configuration.txt"
+    # cf_file = r"C:\develop\nwdm\configuration.txt"
+    cf_file = r'C:\projecten\temp\nwdm\nwdm_local.txt'
 else:
     cf_file = r"C:\develop\nwdm\configuration_nwdm.txt"
 
@@ -113,14 +116,127 @@ class icesdata(Base):
     cndczz01_ueca = Column(Float)
     qv_cndczz01 = Column(Float)
 
+class icesdata_pmp(Base):
+    __tablename__ = 'ices_pmp'
+    recordnr_dataset = Column(Integer, primary_key=True)
+    cruise = Column(String(125))
+    station = Column(String(125))
+    type = Column(String(125))
+    time = Column(String(125))
+    lon  = Column(Float)
+    lat = Column(Float)
+    bot_depth = Column(Float)
+    secchi_depth = Column(Float)
+    device_cat = Column(String(125))
+    platform_code = Column(String(125))
+    distributor = Column(Integer)
+    custodian = Column(Integer)
+    originator = Column(String(125))
+    project_code = Column(String(125))
+    modified = Column(String(125))
+    guid = Column(DateTime)
+    adepzz01_ulaa = Column(Float)
+    qv_adepzz01 = Column(Float)
+    temppr01_upaa = Column(Float)
+    qv_temppr01 = Column(Float)
+    psalpr01_uuuu = Column(Float)
+    qv_psalpr01 = Column(Float)
+    doxyzzxx_umll = Column(Float) 
+    qv_doxyzzxx = Column(Float)
+    phoszzxx_upox = Column(Float)
+    qv_phoszzxx = Column(Float)
+    tphszzxx_upox = Column(Float)
+    qv_tphszzxx = Column(Float)
+    slcazzxx_upox = Column(Float)
+    qv_slcazzxx = Column(Float)
+    ntrazzxx_upox = Column(Float)
+    qv_ntrazzxx = Column(Float)
+    ntrizzxx_upox = Column(Float)
+    qv_ntrizzxx = Column(Float)
+    amonzzxx_upox = Column(Float)
+    qv_amonzzxx = Column(Float)
+    ntotzzxx_upox = Column(Float)
+    qv_ntotzzxx = Column(Float)
+    phxxzzxx_uuph = Column(Float)
+    qv_phxxzzxx = Column(Float)
+    alkyzzxx_meql = Column(Float)
+    qv_alkyzzxx = Column(Float)
+    cphlzzxx_ugpl = Column(Float)
+    qv_cphlzzxx = Column(Float)
+
+#check columns!
+class icesdata_bot(Base):
+    __tablename__ = 'ices_bot'
+    recordnr_dataset = Column(Integer, primary_key=True)
+    cruise = Column(String(125))
+    station = Column(String(125))
+    type = Column(String(125))
+    time = Column(String(125))
+    lon  = Column(Float)
+    lat = Column(Float)
+    bot_depth = Column(Float)
+    secchi_depth = Column(Float)
+    device_cat = Column(Integer)
+    platform_code = Column(String(125))
+    distributor = Column(Integer)
+    custodian = Column(Integer)
+    originator = Column(String(125))
+    project_code = Column(String(125))
+    modified = Column(String(125))
+    guid = Column(DateTime)
+    adepzz01_ulaa = Column(Float)
+    qv_adepzz01 = Column(Float)
+# check rest of the columns
+    temppr01_upaa= Column(Float) 
+    qv_temppr01= Column(Float) 
+    psalpr01_uuuu= Column(Float) 
+    qv_psalpr01= Column(Float)
+    doxyzzxx_umll= Column(Float) 
+    qv_doxyzzxx= Column(Float) 
+    phoszzxx_upox= Column(Float) 
+    qv_phoszzxx= Column(Float)
+    tphszzxx_upox= Column(Float) 
+    qv_tphszzxx= Column(Float) 
+    slcazzxx_upox= Column(Float) 
+    qv_slcazzxx= Column(Float)
+    ntrzzzxx_upox= Column(Float) 
+    qv_ntrzzzxx= Column(Float) 
+    ntrazzxx_upox= Column(Float) 
+    qv_ntrazzxx= Column(Float)
+    ntrizzxx_upox= Column(Float) 
+    qv_ntrizzxx= Column(Float) 
+    amonzzxx_upox= Column(Float) 
+    qv_amonzzxx= Column(Float)
+    ntotzzxx_upox= Column(Float) 
+    qv_ntotzzxx= Column(Float) 
+    h2sxzzxx_upox= Column(Float) 
+    qv_h2sxzzxx= Column(Float)
+    phxxzzxx_uuph= Column(Float) 
+    qv_phxxzzxx= Column(Float) 
+    alkyzzxx_meql= Column(Float) 
+    qv_alkyzzxx= Column(Float)
+    cphlzzxx_ugpl= Column(Float) 
+    qv_cphlzzxx= Column(Float) 
+    turbxxxx_ustu= Column(Float) 
+    qv_turbxxxx= Column(Float)
+    phtxpr01_upaa= Column(Float) 
+    qv_phtxpr01= Column(Float) 
+    corgzzzx_upox= Column(Float) 
+    qv_corgzzzx= Column(Float) 
 # first check if it necessary if you need to create the tables
 if localdev:
     # Base.metadata.drop_all(engine)
-    # Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine)
 else:
+    print('else')
     # Base.metadata.drop_all(engine)
     # Base.metadata.create_all(engine)
 
+    # reading 21 Gb csv, needs be done chunck wise and column wise
+header = 12 # lines 
+chunksize = 10 ** 6
+
+#%%
 # connect to existing table with 
 META_DATA = MetaData(schema='nwdm')
 META_DATA.reflect(engine)
@@ -129,16 +245,11 @@ parameter = META_DATA.tables['nwdm.parameter']
 unit = META_DATA.tables['nwdm.unit']
 quality = META_DATA.tables['nwdm.quality']
 
-
-# reading 21 Gb csv, needs be done chunck wise and column wise
-header = 12 # lines 
-chunksize = 10 ** 6
-
-# dropt the table if exists
-stmt = """drop table if exists import.ices"""
-with engine.connect() as conn:
-    conn.execute(text(stmt))
-    conn.commit()
+# # dropt the table if exists
+# stmt = """drop table if exists import.ices"""
+# with engine.connect() as conn:
+#     conn.execute(text(stmt))
+#     conn.commit()
 
 # several csv
 lstfiles = [r'C:\temp\nwdm\ICES_StationSamples_CTD_2024-07-10.csv',
@@ -189,7 +300,7 @@ def maplstparameters(lstparameters):
         finally:
             print(msg)
 
-    
+#%%  
 ## 0. update data_owners
 strsql = """insert into nwdm.data_owner (data_owner,priority) values ('ICES',11) on conflict do nothing;"""
 with engine.connect() as conn:
@@ -203,8 +314,8 @@ def administratefile(lstfiles):
         r = session.query(dataset).filter_by(dataset_name=os.path.basename(tbl)).first()
         try:
             if str(r) == 'None':
-                stmt = insert(dataset).values(
-                            datasetid = basedsid += 1,
+                basedsid += 1
+                stmt = insert(dataset).values(datasetid = basedsid,
                             dataset_name = os.path.basename(tbl),
                             data_holder = 'ICES',
                             data_owner = 'ICES',
@@ -272,7 +383,7 @@ with engine.connect() as conn:
     conn.execute(text(strsql))
     conn.commit()    
 
-# update per parameter the measurument table
+# update per parameter the measurument table ## optioneel
 stmt = """delete from nwdm.measurement where dataset_id = 700000"""
 with engine.connect() as conn:
     conn.execute(text(stmt))
@@ -336,10 +447,25 @@ for param in lstparamters:
         print('converted data for column ', param, ' to nwdm.measurements')    
         session.close()
         engine.dispose()
-
+# %%
  ## repetative for PMP
- thecsv = r"C:\temp\nwdm\ICES_StationSamples_PMP_2024-07-10.csv"
- lstparameter = ['adepzz01_ulaa',
+
+ # Function to extract and transform column names
+def rename_columns(col_name):
+    if col_name.startswith('QV:ODV:'):
+        match = re.search(r'\((.*?)\)', col_name)
+        if match:
+            extracted = match.group(1).lower()
+            extracted = extracted.split('_')[0]  # Remove the part after the underscore
+            return 'qv_' + extracted
+    else:
+        match = re.search(r'\((.*?)\)', col_name)
+        if match:
+            return match.group(1).lower()
+    return col_name
+
+thecsv = r"C:\projecten\temp\nwdm\ICES_StationSamples_PMP_2024-07-10.csv"
+lstparameter = ['adepzz01_ulaa',
                 'temppr01_upaa',
                 'psalpr01_uuuu',
                 'doxyzzxx_umll',
@@ -353,116 +479,61 @@ for param in lstparamters:
                 'phxxzzxx_uuph',
                 'alkyzzxx_meql',
                 'cphlzzxx_ugpl']
- 
- class icesdata_pmp(Base):
-    __tablename__ = 'ices_pmp'
-    recordnr_dataset = Column(Integer, primary_key=True)
-    cruise = Column(String(125))
-    station = Column(String(125))
-    type = Column(String(125))
-    time = Column(String(125))
-    lon  = Column(Float)
-    lat = Column(Float)
-    bot_depth = Column(Float)
-    secchi_depth = Column(Float)
-    device_cat = Column(Integer)
-    platform_code = Column(String(125))
-    distributor = Column(Integer)
-    custodian = Column(Integer)
-    originator = Column(String(125))
-    project_code = Column(String(125))
-    modified = Column(String(125))
-    guid = Column(DateTime)
-    adepzz01_ulaa = Column(Float)
-    qv_adepzz01 = Column(Float)
-    temppr01_upaa = Column(Float)
-    qv_temppr01 = Column(Float)
-    psalpr01_uuuu = Column(Float)
-    qv_psalpr01 = Column(Float)
-    doxyzzxx_umll = Column(Float) 
-    qv_doxyzzxx = Column(Float)
-    phoszzxx_upox = Column(Float)
-    qv_phoszzxx = Column(Float)
-    tphszzxx_upox = Column(Float)
-    qv_tphszzxx = Column(Float)
-    slcazzxx_upox = Column(Float)
-    qv_slcazzxx = Column(Float)
-    ntrazzxx_upox = Column(Float)
-    qv_ntrazzxx = Column(Float)
-    ntrizzxx_upox = Column(Float)
-    qv_ntrizzxx = Column(Float)
-    amonzzxx_upox = Column(Float)
-    qv_amonzzxx = Column(Float)
-    ntotzzxx_upox = Column(Float)
-    qv_ntotzzxx = Column(Float)
-    phxxzzxx_uuph = Column(Float)
-    qv_phxxzzxx = Column(Float)
-    alkyzzxx_meql = Column(Float)
-    qv_alkyzzxx = Column(Float)
-    cphlzzxx_ugpl = Column(Float)
-    qv_cphlzzxx = Column(Float)
+
+mapping_table = pd.read_excel(r"C:\projecten\temp\nwdm\datacolumns_2.xlsx", sheet_name = 'mapping_table')
+# Convert the mapping DataFrame to a dictionary
+mapping_table = pd.Series(mapping_table.New_name.values, index=mapping_table.Old_name).to_dict()
 
 # read pmp csv table , check columsn in the chunk.columns
-with pd.read_csv(thecsv, sep=',',header=12, dtype={1:'str'},chunksize=chunksize) as reader:
+with pd.read_csv(thecsv, sep=',',header=16, dtype={1:'str'},chunksize=chunksize) as reader:
+    first_chunk = next(reader)
+    # Use the first chunk for mapping and upload the first chunk
+    mapped_headers = [mapping_table.get(col, col) for col in first_chunk.columns]
+    # Process the first chunk with the new headers
+    first_chunk.columns = mapped_headers
+    first_chunk.rename(columns={col: rename_columns(col) for col in first_chunk.columns}, inplace=True)
+    chns = sqldf('''select * from first_chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
+    chns.to_sql('ices_pmp', engine,schema='import',if_exists='append',index=False)
+    print('uploaded first chunk')
     for chunk in reader:
-        chunk.columns=['cruise','station','type','time','lon','lat','bot_depth','secchi_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','slcazzxx_upox','qv_slcazzxx','ntrazzxx_upox','qv_ntrazzx','phxxzzxx_uuph','qv_phxxzzxx','chplzzxx_ugpl','qv_cphllzzxx','cndczz01_ueca','qv_condczz01']
+        chunk.columns= mapped_headers #use the mapped headers for the next chunk
+        chunk.rename(columns={col: rename_columns(col) for col in chunk.columns}, inplace=True)
         chns = sqldf('''select * from chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
-        chns.to_sql('ices', engine,schema='import',if_exists='append',index=False)
+        chns.to_sql('ices_pmp', engine,schema='import',if_exists='append',index=False)
+        print('uploaded chunk')
 
+print('finish pmp')
 
+#%% BOT
 
- class icesdata_pmp(Base):
-    __tablename__ = 'ices_bot'
-    recordnr_dataset = Column(Integer, primary_key=True)
-    cruise = Column(String(125))
-    station = Column(String(125))
-    type = Column(String(125))
-    time = Column(String(125))
-    lon  = Column(Float)
-    lat = Column(Float)
-    bot_depth = Column(Float)
-    secchi_depth = Column(Float)
-    device_cat = Column(Integer)
-    platform_code = Column(String(125))
-    distributor = Column(Integer)
-    custodian = Column(Integer)
-    originator = Column(String(125))
-    project_code = Column(String(125))
-    modified = Column(String(125))
-    guid = Column(DateTime)
-    adepzz01_ulaa = Column(Float)
-    qv_adepzz01 = Column(Float)
-# check rest of the columns
-    temppr01_upaa = Column(Float)
-    qv_temppr01 = Column(Float)
-    psalpr01_uuuu = Column(Float)
-    qv_psalpr01 = Column(Float)
-    doxyzzxx_umll = Column(Float) 
-    qv_doxyzzxx = Column(Float)
-    phoszzxx_upox = Column(Float)
-    qv_phoszzxx = Column(Float)
-    tphszzxx_upox = Column(Float)
-    qv_tphszzxx = Column(Float)
-    slcazzxx_upox = Column(Float)
-    qv_slcazzxx = Column(Float)
-    ntrazzxx_upox = Column(Float)
-    qv_ntrazzxx = Column(Float)
-    ntrizzxx_upox = Column(Float)
-    qv_ntrizzxx = Column(Float)
-    amonzzxx_upox = Column(Float)
-    qv_amonzzxx = Column(Float)
-    ntotzzxx_upox = Column(Float)
-    qv_ntotzzxx = Column(Float)
-    phxxzzxx_uuph = Column(Float)
-    qv_phxxzzxx = Column(Float)
-    alkyzzxx_meql = Column(Float)
-    qv_alkyzzxx = Column(Float)
-    cphlzzxx_ugpl = Column(Float)
-    qv_cphlzzxx = Column(Float)
+thecsv = r"C:\projecten\temp\nwdm\ICES_StationSamples_BOT_2024-07-10.csv"
 
-# read bot table , check columsn in the chunk.columns
-with pd.read_csv(thecsv, sep=',',header=12, dtype={1:'str'},chunksize=chunksize) as reader:
+mapping_table = pd.read_excel(r"C:\projecten\temp\nwdm\datacolumns_2.xlsx", sheet_name = 'mapping_table')
+# Convert the mapping DataFrame to a dictionary
+mapping_table = pd.Series(mapping_table.New_name.values, index=mapping_table.Old_name).to_dict()
+
+# read pmp csv table , check columsn in the chunk.columns
+with pd.read_csv(thecsv, sep=',',header=21, dtype={1:'str'},chunksize=chunksize) as reader:
+    first_chunk = next(reader)
+    # Map the headers
+    mapped_headers = [mapping_table.get(col, col) for col in first_chunk.columns]
+    # Process the first chunk with the new headers
+    first_chunk.columns = mapped_headers
+    first_chunk.rename(columns={col: rename_columns(col) for col in first_chunk.columns}, inplace=True)
+    first_chunk.drop(columns={'Secchi Depth [m]'}, inplace=True)
+    chns = sqldf('''select * from first_chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
+    chns.to_sql('ices_bot', engine,schema='import',if_exists='append',index=False)
+    print('uploaded first chunk')
+
     for chunk in reader:
-        chunk.columns=['cruise','station','type','time','lon','lat','bot_depth','secchi_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','slcazzxx_upox','qv_slcazzxx','ntrazzxx_upox','qv_ntrazzx','phxxzzxx_uuph','qv_phxxzzxx','chplzzxx_ugpl','qv_cphllzzxx','cndczz01_ueca','qv_condczz01']
+        #rest of the chunks automatically
+        chunk.columns = mapped_headers
+        chunk.drop(columns={'Secchi Depth [m]'}, inplace=True)
+        chunk.rename(columns={col: rename_columns(col) for col in chunk.columns}, inplace=True)
         chns = sqldf('''select * from chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
-        chns.to_sql('ices', engine,schema='import',if_exists='append',index=False)
+        chns.to_sql('ices_bot', engine,schema='import',if_exists='append',index=False)
+        print('uploaded chunk')
+
+print('finish bot')
+
+# %%
