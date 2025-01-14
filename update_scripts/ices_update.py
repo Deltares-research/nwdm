@@ -32,7 +32,7 @@ import os
 import sys  
 import pandas as pd
 from pandasql import sqldf
-from sqlalchemy import text, Table, Column, String, Integer, MetaData, DateTime, Float, insert, select
+from sqlalchemy import text, Table, Column, String, Integer, MetaData, DateTime, Float, insert, select, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import DeclarativeBase
 import re
@@ -41,10 +41,10 @@ import re
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import utils
 
-localdev = True
+localdev = False
 if localdev:
-    # cf_file = r"C:\develop\nwdm\configuration.txt"
-    cf_file = r'C:\projecten\temp\nwdm\nwdm_local.txt'
+    cf_file = r"C:\develop\nwdm\configuration.txt"
+    #cf_file = r'C:\projecten\temp\nwdm\nwdm_local.txt'
 else:
     cf_file = r"C:\develop\nwdm\configuration_nwdm.txt"
 
@@ -226,11 +226,11 @@ class icesdata_bot(Base):
 # first check if it necessary if you need to create the tables
 if localdev:
     # Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    # Base.metadata.create_all(engine)
 else:
     print('else')
     # Base.metadata.drop_all(engine)
-    # Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine)
 
     # reading 21 Gb csv, needs be done chunck wise and column wise
 header = 12 # lines 
@@ -245,48 +245,19 @@ parameter = META_DATA.tables['nwdm.parameter']
 unit = META_DATA.tables['nwdm.unit']
 quality = META_DATA.tables['nwdm.quality']
 
-# # dropt the table if exists
-# stmt = """drop table if exists import.ices"""
-# with engine.connect() as conn:
-#     conn.execute(text(stmt))
-#     conn.commit()
 
-# several csv
-lstfiles = [r'C:\temp\nwdm\ICES_StationSamples_CTD_2024-07-10.csv',
-            r"C:\temp\nwdm\ICES_StationSamples_BOT_2024-07-10.csv",
-            r"C:\temp\nwdm\ICES_StationSamples_PMP_2024-07-10.csv"]
-
-# only select data within 
-# "BOX(-15.304392 42.875958,13.278998 64.098841)"
-# via the sqldf package the subsetting is set up, then store the data in temp data part
-with pd.read_csv(thecsv, sep=',',header=12, dtype={1:'str'},chunksize=chunksize) as reader:
-    for chunk in reader:
-        chunk.columns=['cruise','station','type','time','lon','lat','bot_depth','secchi_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','slcazzxx_upox','qv_slcazzxx','ntrazzxx_upox','qv_ntrazzx','phxxzzxx_uuph','qv_phxxzzxx','chplzzxx_ugpl','qv_cphllzzxx','cndczz01_ueca','qv_condczz01']
-        chns = sqldf('''select * from chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
-        chns.to_sql('ices', engine,schema='import',if_exists='append',index=False)
-
-
-# insert into mapping table
-lstparamters = ['adepzz01_ulaa',
-                'temppr01_upaa',
-                'psalpr01_uuuu',
-                'doxyzzxx_umll',
-                'phoszzxx_upox',
-                'slcazzxx_upox',
-                'ntrazzxx_upox',
-                'phxxzzxx_uuph',
-                'cphlzzxx_ugpl']
-
+# function that maps parameters agains P01
 def maplstparameters(lstparameters):
     i = 0
-    for c in lstparamters:
+    for c in lstparameters:
         i=i+1
         # first check if specific mapping already exists
         r = session.query(mapping).filter_by(icescolumn=c).first()
         msg = str(r)
         try:
             if str(r) == "None":
-                stmt = insert(mapping).values(icesid=i,
+                maxidx = session.query(func.max(mapping.icesid)).first() 
+                stmt = insert(mapping).values(icesid=maxidx[0]+1,
                                             icescolumn=c,
                                             p01=c.split('_')[0].upper(),
                                             p06=c.split('_')[1].upper(),
@@ -300,6 +271,44 @@ def maplstparameters(lstparameters):
         finally:
             print(msg)
 
+
+# # dropt the table if exists
+# stmt = """drop table if exists import.ices"""
+# with engine.connect() as conn:
+#     conn.execute(text(stmt))
+#     conn.commit()
+
+# several csvs, for all these csv's different header sizes are used
+# dict is list of csvs incl. 
+# values of the dict are:
+# thecsv = full path to csv
+# hdr = the header size ( // sign is headersize that needs to be taken into account)
+# cols = list of colums (total list of colums in the csv, mapped to something readable (and equal to table definition above))
+# lstparams = list of parameters that need to be mapped with BODC list, (P01)
+dctcsv = {}
+dctcsv['CTD'] = [r'C:\temp\nwdm\ICES_StationSamples_CTD_2024-07-10.csv',12, ['cruise','station','type','time','lon','lat','bot_depth','secchi_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','slcazzxx_upox','qv_slcazzxx','ntrazzxx_upox','qv_ntrazzx','phxxzzxx_uuph','qv_phxxzzxx','chplzzxx_ugpl','qv_cphllzzxx','cndczz01_ueca','qv_condczz01'],['adepzz01_ulaa','temppr01_upaa','psalpr01_uuuu','doxyzzxx_umll','phoszzxx_upox','slcazzxx_upox','ntrazzxx_upox','phxxzzxx_uuph','cphlzzxx_ugpl']]
+dctcsv['BOT'] = [r"C:\temp\nwdm\ICES_StationSamples_BOT_2024-07-10.csv",21, ['cruise','station','type','time','lon','lat','bot_depth','secchi_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','tphszzxx_upox','qv_tphszzxx','slcazzxx_upox','qv_slcazzxx','ntrzzzxx_upox','qv_ntrzzzxx','ntrazzxx_upox','qv_ntrazzxx','ntrizzxx_upox','qv_ntrizzxx','amonzzxx_upox','qv_amonzzxx','ntotzzxx_upox','qv_ntotzzxx','h2sxzzxx_upox','qv_h2sxzzxx','phxxzzxx_uuph','qv_phxxzzxx','alkyzzxx_meql','qv_alkyzzxx','cphlzzxx_ugpl','qv_cphlzzxx','turbxxxx_ustu','qv_turbxxxx','phtxpr01_upaa','qv_phtxpr01','corgzzzx_upox','qv_corgzzzx'],['adepzz01_ulaa','temppr01_upaa','psalpr01_uuuu','doxyzzxx_umll','phoszzxx_upox','tphszzxx_upox','slcazzxx_upox','ntrzzzxx_upox','ntrazzxx_upox','ntrizzxx_upox','amonzzxx_upox','ntotzzxx_upox','h2sxzzxx_upox','phxxzzxx_uuph','alkyzzxx_meql','cphlzzxx_ugpl','turbxxxx_ustu','phtxpr01_upaa','corgzzzx_upox']]
+dctcsv['PMP'] = [r"C:\temp\nwdm\ICES_StationSamples_PMP_2024-07-10.csv",16, ['cruise','station','time','lon','lat','bot_depth','device_cat','platform_code','distributor','custodian','originator','project_code','modified','guid','adepzz01_ulaa','qv_adepzz01','temppr01_upaa','qv_temppr01','psalpr01_uuuu','qv_psalpr01','doxyzzxx_umll','qv_doxyzzxx','phoszzxx_upox','qv_phoszzxx','tphszzxx_upox','qv_tphszzxx','slcazzxx_upox','qv_slcazzxx','ntrazzxx_upox','qv_ntrazzxx','ntrizzxx_upox','qv_ntrizzxx','amonzzxx_upox','qv_amonzzxx','ntotzzxx_upox','qv_ntotzzxx','phxxzzxx_uuph','qv_phxxzzxx','alkyzzxx_meql','qv_alkyzzxx','cphlzzxx_ugpl','qv_cphlzzxx'],['adepzz01_ulaa','temppr01_upaa','psalpr01_uuuu','doxyzzxx_umll','phoszzxx_upox','tphszzxx_upox','slcazzxx_upox','ntrazzxx_upox','ntrizzxx_upox','amonzzxx_upox','ntotzzxx_upox','phxxzzxx_uuph','alkyzzxx_meql','cphlzzxx_ugpl']]
+
+
+# only select data within 
+# "BOX(-15.304392 42.875958,13.278998 64.098841)"
+# via the sqldf package the subsetting is set up, then store the data in temp data part
+for param in dctcsv.keys():
+    thecsv  = dctcsv[param][0]
+    hdr     = dctcsv[param][1]
+    cols    = dctcsv[param][2]
+    # update the parameter mapping_ices table against P01
+    lstprms = dctcsv[param][3]
+    maplstparameters(lstprms)
+    # load the data in the database.
+    with pd.read_csv(thecsv, sep=',',header=hdr, dtype={1:'str'},chunksize=chunksize) as reader:
+        for chunk in reader:
+            chunk.columns=cols
+            chns = sqldf('''select * from chunk where lon > -15 and lon < 13.3 and lat > 42.8 and lat < 64.1''')
+            chns.to_sql('_'.join(['ices',param.lower()]), engine,schema='import',if_exists='append',index=False)
+
+
 #%%  
 ## 0. update data_owners
 strsql = """insert into nwdm.data_owner (data_owner,priority) values ('ICES',11) on conflict do nothing;"""
@@ -308,14 +317,20 @@ with engine.connect() as conn:
     conn.commit()    
 
 ## 1. update administration of source - dataset id
-def administratefile(lstfiles):
-    basedsid = 700000  
-    for tbl in lstfiles:
+def administratefile(lsttbls,basedsid):
+    """File administration in the datamodel. Baseid is an arbitrary number
+
+    Args:
+        lsttbl (list): list of table names (in the routine the basename, so only the filename, without path will be extracted and used)
+        baseid (interger): arbitrary number (in case of ICES data 700000)
+    """
+    for tbl in lsttbls:
+        print('registring file', os.path.basename(tbl))
         r = session.query(dataset).filter_by(dataset_name=os.path.basename(tbl)).first()
         try:
             if str(r) == 'None':
                 basedsid += 1
-                stmt = insert(dataset).values(datasetid = basedsid,
+                stmt = insert(dataset).values(dataset_id = basedsid,
                             dataset_name = os.path.basename(tbl),
                             data_holder = 'ICES',
                             data_owner = 'ICES',
@@ -325,65 +340,62 @@ def administratefile(lstfiles):
                 with engine.connect() as conn:
                                     conn.execute(stmt)
                                     conn.commit()
-            msg = ('added ices column '+ os.path.basename(tbl)+ ' to dataset table')
+                msg = ('added ices column '+ os.path.basename(tbl)+ ' to dataset table with number', basedsid)
+            else:
+                msg = (os.path.basename(tbl)+ ' already registered with id', r[0])
         except:
-            msg("exception raised while retrieving/assigning item to mapping table, item is "+c)
+            msg("exception raised while retrieving/assigning item to mapping table, item is ")
         finally:
-            print(msg)            
+            print(msg)
 
+# the data is ordered in a dictionary that has a list of parameters for each file that needed to be loaded
+# construct a list of files from the dictionary
+baseid = 700000
+lsttbls = []
+for ds in dctcsv.keys():
+    tbl = dctcsv[ds][0]
+    lsttbls.append(tbl)
 
-    # datasetid = basedsid+i
-    # strsql = """insert into nwdm.dataset(dataset_id, dataset_name, short_filename, "path", file, number_of_records, data_holder, data_owner, link_to_data, link_to_metadata)
-    # select 700000 dataset_id
-    # , 'ICES_StationSamples_CTD_2024-07-10.csv' as dataset_name
-    # , 'null' as short_filename
-    # , 'null' as "_path"
-    # , 'null' as file
-    # ,  null number_of_records
-    # , 'ICES' as data_holder
-    # , 'ICES' as data_owner
-    # , 'https://www.ices.dk/data' as link_to_data
-    # , 'https://gis.ices.dk/geonetwork/srv/eng/catalog.search#/search?facet.q=type%2Fdataset%26orgName%2FICES' as link_to_metadata"""
-    # with engine.connect() as conn:
-    #     conn.execute(text(strsql))
-    #     conn.commit()    
-
-strsql = """update nwdm.dataset set dataset_name = 'ICES_StationSamples_CTD_2024-07-10.csv' 
-            where data_holder = 'ICES' and data_owner = 'ICES' """
-with engine.connect() as conn:
-    conn.execute(text(strsql))
-    conn.commit()    
+administratefile(lsttbls,baseid)
 
 ### update 11. ices locations
+# following query only necessary if you need to delete all locations.
 strsql = """delete from nwdm.location where data_owner='ICES';"""
 with engine.connect() as conn:
     conn.execute(text(strsql))
     conn.commit()    
 
-strsql = """insert into nwdm.location(location_code, location_name,x,y,epsg,geom,number_of_observations,first_year, last_year,data_owner)
-select *
-from (
-    select
-     'ices_'||cruise||'_'||(row_number() over ())::text as location_code  -- check if this needs to be a unique number
-    , coalesce(station, 'station'||cruise::varchar) as location_name
-    , (rd.lon)::decimal as x
-    , (rd.lat)::decimal as y
-    , 4326::int as epsg
-    , st_setsrid(st_makepoint(lon,lat), 4326::int) as geom
-	, rd.noobs as number_of_observations
-	, rd.startyear as startyear
-	, rd.endyear as lastyear
-    , 'ICES' data_owner
-    from (	select distinct cruise, station, lat, lon, count(*) as noobs, min(left(time,4)::int) as startyear, max(left(time,4)::int) as endyear
-			from import.ices
-			group by cruise, station, lat, lon
-    ) rd
-) g where st_contains((select geom from nwdm.scope_northsea),g.geom);"""
-with engine.connect() as conn:
-    conn.execute(text(strsql))
-    conn.commit()    
+for entry in dctcsv.keys():
+    tbl = '_'.join(['ices',entry.lower()])
+    print(tbl) 
+    strsql = f"""insert into nwdm.location(location_code, location_name,x,y,epsg,geom,number_of_observations,first_year, last_year,data_owner)
+    select *
+    from (
+        select
+        '{tbl}'||'_'||cruise||'_'||station||'_'||time::text||'_'||lat::text||'_'||lon::text as location_code
+        , coalesce(station, 'station'||cruise::varchar) as location_name
+        , (rd.lon)::decimal as x
+        , (rd.lat)::decimal as y
+        , 4326::int as epsg
+        , st_setsrid(st_makepoint(lon,lat), 4326::int) as geom
+        , rd.noobs as number_of_observations
+        , rd.startyear as startyear
+        , rd.endyear as lastyear
+        , 'ICES' data_owner
+        from (	select distinct cruise, station, time, lat, lon, count(*) as noobs, min(left(time,4)::int) as startyear, max(left(time,4)::int) as endyear
+                from import.{tbl}
+                group by cruise, station, lat, lon, time
+        ) rd
+    ) g where st_contains((select geom from nwdm.scope_northsea),g.geom);"""
+    with engine.connect() as conn:
+        conn.execute(text(strsql))
+        conn.commit()
 
-# update per parameter the measurument table ## optioneel
+# line cruise||'_'||station||'_'||time::text||'_'||lat::text||'_'||lon::text as location_code
+# used as alternative for 'ices_'||cruise||'_'||(row_number() over ())::text as location_code  -- check if this needs to be a unique number
+# it enables finding the correct location in following steps.
+
+# update per parameter the measurument table ## optional query, mostly used during testing
 stmt = """delete from nwdm.measurement where dataset_id = 700000"""
 with engine.connect() as conn:
     conn.execute(text(stmt))
@@ -394,59 +406,66 @@ with engine.connect() as conn:
 
 # the dataset is not consequent with respect to time notation
 # sometimes there are times like "1993-03-22T15Z" where it should at least be "1993-03-22T15:00Z"
+# hence the case part in the query where the notation is harmonized
+for typobs in dctcsv.keys():
+    thecsv = os.path.basename(dctcsv[typobs][0])
+    datasetid = session.query(dataset).filter_by(dataset_name=thecsv).first()[0]
+    lstprms = dctcsv[typobs][3]
+    imptable = '_'.join(['ices',typobs.lower()])
+    print(typobs, 'has parameters',lstprms)
+    for param in lstprms:
+        if param != 'adepzz01_ulaa':
+            session, engine = utils.establish_connection(None, connstr)
+            decparameter = param.split('_')[0].upper()
+            decunit = param.split('_')[1].upper()
+            idparam = session.query(parameter).filter_by(code=decparameter).first()
+            idunit  = session.query(unit).filter_by(code=decunit).first()
+            qualityclmn = 'qv_'+decparameter.lower()
 
-datasetid = 700000
-for param in lstparamters:
-    if param != 'adepzz01_ulaa':
-        session, engine = utils.establish_connection(None, connstr)
-        decparameter = param.split('_')[0].upper()
-        decunit = param.split('_')[1].upper()
-        idparam = session.query(parameter).filter_by(code=decparameter).first()
-        idunit  = session.query(unit).filter_by(code=decunit).first()
-        qualityclmn = 'qv_'+decparameter.lower()
-        stmt = f"""insert into nwdm.measurement (recordnr_dataset, 
-                    location_id,
-                    dataset_id,                  
-                    "depth", 
-                    depth_quality_id,
-                    vertical_reference_id, 
-                    parameter_id, 
-                    unit_id, 
-                    value, 
-                    quality_id,
-                    geom,
-                    "date")
-                select 
-                    imp.recordnr_dataset, 
-                    l.location_id,
-                    {datasetid},
-                    imp.adepzz01_ulaa,
-                    qvd.quality_id,
-                    vr.vertical_reference_id,
-                    {idparam.parameter_id},
-                    {idunit.unit_id},
-                    {param}::numeric,
-                    {qualityclmn}::numeric,
-                    st_setsrid(st_point(lon,lat),4326),
-                    case
-                        when length(time) = 10 then (time||'T00:00Z')::timestamp
-                        when length(time) = 14 then replace(time,'Z','00Z')::timestamp
-                        else time::timestamp
-                    end
-                    from import.ices imp
-                    join nwdm.vertical_reference vr on vr.code = 'D08'
-                    join nwdm.quality qv on qv.code = {qualityclmn}::text 
-                    join nwdm.quality qvd on qvd.code = imp.qv_adepzz01::text
-                    join nwdm.location l on l.location_name = coalesce(imp.station, 'station'||imp.cruise::varchar) 
-                                                            and l.x = imp.lon::decimal and l.y = imp.lat::decimal 
-                    where {param} is not null"""
-        with engine.connect() as conn:
-            conn.execute(text(stmt))
-            conn.commit()
+            stmt = f"""insert into nwdm.measurement (recordnr_dataset, 
+                        location_id,
+                        dataset_id,                  
+                        "depth", 
+                        depth_quality_id,
+                        vertical_reference_id, 
+                        parameter_id, 
+                        unit_id, 
+                        value, 
+                        quality_id,
+                        geom,
+                        "date")
+                    select 
+                        imp.recordnr_dataset, 
+                        l.location_id,
+                        {datasetid},
+                        imp.adepzz01_ulaa,
+                        qvd.quality_id,
+                        vr.vertical_reference_id,
+                        {idparam.parameter_id},
+                        {idunit.unit_id},
+                        {param}::numeric,
+                        qv.quality_id,
+                        st_setsrid(st_point(lon,lat),4326),
+                        case
+                            when length(time) = 10 then (time||'T00:00Z')::timestamp
+                            when length(time) = 14 then replace(time,'Z','00Z')::timestamp
+                            else time::timestamp
+                        end
+                        from import.{imptable} imp
+                        join nwdm.vertical_reference vr on vr.code = 'D08'
+                        join nwdm.quality qv on qv.code = imp.{qualityclmn}::text 
+                        join nwdm.quality qvd on qvd.code = imp.qv_adepzz01::text
+                        join nwdm.location l on l.location_code = '{imptable}'||'_'||imp.cruise||'_'||imp.station||'_'||imp.time::text||'_'||imp.lat::text||'_'||imp.lon::text
+                        where {param} is not null and imp.{qualityclmn} is not null"""
+            with engine.connect() as conn:
+                conn.execute(text(stmt))
+                conn.commit()
+            print('converted data for column ', param, ' to nwdm.measurements')    
+            session.close()
+            engine.dispose()
 
-        print('converted data for column ', param, ' to nwdm.measurements')    
-        session.close()
-        engine.dispose()
+# after this initial loading, the sqls in nabewerking.sql should be executed.
+
 # %%
  ## repetative for PMP
 
